@@ -165,6 +165,7 @@ function send(): void {
     if (!isSlash) appendMessage(messagesEl, 'user', text);
     S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.thinkingText = ''; S.pendingText = '';
     S.terminalBlocks.clear();
+      S.toolCommandMap.clear();
     S.pendingSlashResponse = isSlash;
     if (!isSlash) showWaiting(messagesEl);
   } else {
@@ -465,13 +466,23 @@ window.addEventListener('message', (e: MessageEvent) => {
             statusEl.textContent = isDone ? '✓' : isError ? '✗' : '⋯';
             statusEl.className = `tool-status${isDone ? ' done' : isError ? ' error' : ''}`;
           }
-          // Update terminal block output if this is an execute tool
-          const termBlock = document.querySelector(`[data-term-id="${msg.toolCallId}"]`);
-          if (termBlock && (msg as any).toolOutput) {
-            const body = termBlock.querySelector('.term-body') as HTMLElement;
-            if (body) body.textContent = (msg as any).toolOutput;
-            if (isDone || isError) termBlock.classList.add('term-done');
+        }
+        // Update terminal block output for execute/bash tools.
+        // If the terminal block exists (data-term-id), update its body.
+        // If it doesn't exist yet but we have output, create one from the
+        // stored command info.
+        let termBlock = document.querySelector(`[data-term-id="${msg.toolCallId}"]`);
+        if (!termBlock && (msg as any).toolOutput) {
+          const info = S.toolCommandMap.get(msg.toolCallId);
+          if (info) {
+            termBlock = renderTerminalBlock(messagesEl, msg.toolCallId, info, '', false);
           }
+        }
+        if (termBlock && (msg as any).toolOutput) {
+          const body = termBlock.querySelector('.term-body') as HTMLElement;
+          if (body) body.textContent = (msg as any).toolOutput;
+          const isDone = msg.toolStatus === 'done' || msg.toolStatus === 'completed';
+          if (isDone || msg.toolStatus === 'error') termBlock.classList.add('term-done');
         }
         break;
       }
@@ -485,9 +496,16 @@ window.addEventListener('message', (e: MessageEvent) => {
       const statusIcon = isDone ? '✓' : isError ? '✗' : '⋯';
       const statusClass = isDone ? ' done' : isError ? ' error' : '';
 
-      // Render execute/bash tools as terminal blocks with full command + output
-      if (msg.toolKind === 'execute' && msg.toolName) {
-        const cmd = msg.toolName.replace(/^Bash:\s*/, '').trim() || msg.toolName;
+      // Detect terminal/bash/shell tools by kind OR by tool name prefix
+      const isTerminal = msg.toolKind === 'execute'
+        || msg.toolKind === 'bash'
+        || msg.toolKind === 'terminal'
+        || msg.toolKind === 'shell'
+        || /^(Bash|Terminal|Shell|Command):/i.test(msg.toolName ?? '');
+
+      if (isTerminal && msg.toolName) {
+        const cmd = msg.toolName.replace(/^(Bash|Terminal|Shell|Command):\s*/i, '').trim() || msg.toolName;
+        if (msg.toolCallId) S.toolCommandMap.set(msg.toolCallId, cmd);
         renderTerminalBlock(messagesEl, msg.toolCallId ?? '', cmd, (msg as any).toolOutput ?? '', isDone);
       } else {
         const toolEl = appendDiv(messagesEl, 'msg tool');
@@ -586,6 +604,7 @@ window.addEventListener('message', (e: MessageEvent) => {
       ctxBarWrap.style.display = 'none';
       S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.thinkingText = ''; S.pendingText = '';
       S.terminalBlocks.clear();
+      S.toolCommandMap.clear();
       setBusy(false);
       statusContextEl.textContent = ''; statusContextEl.className = '';
       break;
