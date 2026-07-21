@@ -792,8 +792,8 @@ const CSS_TEMPLATE = /* css */ `
       font-family: var(--ui-font);
       font-size: 0.85em;
       line-height: 1.4;
-      max-height: 400px;
-      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
     .thinking-block p { margin: 0.2em 0; }
     .thinking-block blockquote {

@@ -113,14 +113,32 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
             if (info && info.paths.length > 0 && (info.kind === 'edit' || info.kind === 'read')) {
               for (const filePath of info.paths) {
                 this.openFileInEditor(filePath, info.kind === 'edit');
-                // Show diff for edit operations
+                // Show diff for edit operations with accept/reject + feedback
                 if (info.kind === 'edit') {
                   const original = this.editSnapshots.get(filePath);
                   if (original !== undefined) {
                     try {
                       const newContent = fs.readFileSync(filePath, 'utf8');
                       if (original !== newContent) {
-                        void showDiff({ filePath, originalContent: original, newContent });
+                        // Async IIFE — the onUpdate callback is synchronous
+                        void (async () => {
+                          const accepted = await showDiff({ filePath, originalContent: original, newContent });
+                          if (!accepted) {
+                            const fb = await vscode.window.showInputBox({
+                              prompt: `Rejected: ${path.basename(filePath)}. Tell the agent why:`,
+                              placeHolder: 'e.g. Wrong approach — use X instead, or explain why this change is incorrect...',
+                              ignoreFocusOut: true,
+                            });
+                            if (fb?.trim()) {
+                              this.log(`[diff] rejected with feedback: ${fb.trim()}`);
+                              this.store.addUserMessage(fb.trim());
+                              // Defer sending so the current turn can fully complete
+                              setTimeout(() => {
+                                void this.runPrompt(fb.trim());
+                              }, 300);
+                            }
+                          }
+                        })();
                       }
                     } catch { /* file read failed */ }
                     this.editSnapshots.delete(filePath);
