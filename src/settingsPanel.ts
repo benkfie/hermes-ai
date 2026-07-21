@@ -2,7 +2,7 @@
  * SettingsPanel — VS Code WebviewView provider for Hermes settings.
  *
  * Renders a tabbed settings UI and bridges messages between the webview
- * and the config/secret/MCP managers.
+ * and the config manager.
  */
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -15,33 +15,20 @@ import {
   getEnvPath,
   getModel,
   setModel,
-  getApiKeys,
-  setApiKey,
-  removeApiKey,
   isHermesInstalled,
   getHermesVersion,
 } from './config/configManager';
-import { readEnv, writeEnv, removeEnvEntry, maskSecret } from './config/secretManager';
-import { listMcpServers, addMcpServer, removeMcpServer, testMcpServer } from './config/mcpManager';
 
 type SettingsMessage =
   | { type: 'ready' }
   | { type: 'getConfig' }
   | { type: 'setConfig'; key: string; value: string }
   | { type: 'setModel'; provider: string; model: string }
-  | { type: 'setApiKey'; provider: string; value: string }
-  | { type: 'removeApiKey'; provider: string }
-  | { type: 'getMcpServers' }
-  | { type: 'addMcpServer'; name: string; transport: string; command?: string; url?: string }
-  | { type: 'removeMcpServer'; name: string }
-  | { type: 'testMcpServer'; name: string }
   | { type: 'saveModelVisibility'; visibility: Record<string, boolean> };
 
 type SettingsResponse =
   | { type: 'config'; data: Record<string, unknown> }
-  | { type: 'error'; message: string }
-  | { type: 'mcpServers'; servers: any[] }
-  | { type: 'mcpTestResult'; name: string; ok: boolean; message: string };
+  | { type: 'error'; message: string };
 
 /**
  * Load the full model catalog from Hermes cache file.
@@ -125,7 +112,6 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
         case 'getConfig': {
           // Send everything the settings UI needs
           const config = getConfig();
-          const envEntries = readEnv();
           const modelCatalog = loadModelCatalog();
 
           this.post({
@@ -138,10 +124,6 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
               terminal: config.terminal,
               timezone: config.timezone,
               contextCompression: config.contextCompression,
-              apiKeys: envEntries.reduce((acc, e) => ({
-                ...acc,
-                [e.key]: { masked: e.masked, isSet: e.isSet },
-              }), {} as Record<string, { masked: string; isSet: boolean }>),
               hermesInstalled: isHermesInstalled(),
               hermesVersion: getHermesVersion(),
               configPath: getConfigPath(),
@@ -164,50 +146,8 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
           break;
         }
 
-        case 'setApiKey': {
-          setApiKey(msg.provider, msg.value);
-          await this.handleMessage({ type: 'getConfig' });
-          break;
-        }
-
-        case 'removeApiKey': {
-          removeApiKey(msg.provider);
-          await this.handleMessage({ type: 'getConfig' });
-          break;
-        }
-
         case 'saveModelVisibility': {
           this.saveModelVisibility(msg.visibility);
-          break;
-        }
-
-        case 'getMcpServers': {
-          const servers = listMcpServers();
-          this.post({ type: 'mcpServers', servers });
-          break;
-        }
-
-        case 'addMcpServer': {
-          if (msg.transport === 'stdio' && msg.command) {
-            addMcpServer(msg.name, { type: 'stdio', command: msg.command });
-          } else if (msg.url) {
-            addMcpServer(msg.name, { type: msg.transport as 'sse' | 'http', url: msg.url });
-          }
-          const servers = listMcpServers();
-          this.post({ type: 'mcpServers', servers });
-          break;
-        }
-
-        case 'removeMcpServer': {
-          removeMcpServer(msg.name);
-          const servers = listMcpServers();
-          this.post({ type: 'mcpServers', servers });
-          break;
-        }
-
-        case 'testMcpServer': {
-          const result = testMcpServer(msg.name);
-          this.post({ type: 'mcpTestResult', name: msg.name, ok: result.ok, message: result.message });
           break;
         }
       }
@@ -410,98 +350,6 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
     .status-badge.ok { background: #1b3a2d; color: var(--ok-fg); }
     .status-badge.err { background: #3a1d1d; color: var(--error-fg); }
 
-    .api-key-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .api-key-row:last-child { border-bottom: none; }
-
-    .api-key-label {
-      flex: 1;
-      font-weight: 600;
-    }
-
-    .api-key-value {
-      font-family: monospace;
-      font-size: 12px;
-      opacity: 0.7;
-    }
-
-    .api-key-actions {
-      display: flex;
-      gap: 4px;
-    }
-
-    .model-provider-group { margin-bottom: 16px; }
-
-    .model-provider-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-      flex-wrap: wrap;
-    }
-
-    .model-provider-header h3 {
-      margin: 0;
-      font-size: 13px;
-      font-weight: 600;
-    }
-
-    .provider-count {
-      font-weight: normal;
-      opacity: 0.6;
-    }
-
-    .model-search {
-      flex: 1;
-      max-width: 200px;
-      padding: 2px 6px;
-      font-size: 11px;
-      background: var(--input-bg);
-      color: var(--input-fg);
-      border: 1px solid var(--input-border);
-      border-radius: 2px;
-    }
-
-    .models-list { display: flex; flex-direction: column; gap: 2px; }
-
-    .model-item {
-      padding: 4px 0;
-    }
-
-    .model-item label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      padding: 4px 0;
-    }
-
-    .model-item input[type="checkbox"] {
-      width: 16px;
-      height: 16px;
-      flex-shrink: 0;
-    }
-
-    .model-name {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .model-id {
-      font-family: monospace;
-      font-size: 10px;
-      opacity: 0.4;
-      flex-shrink: 0;
-    }
-
     .spacer { margin-top: 20px; }
 
     .hidden { display: none !important; }
@@ -530,34 +378,6 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
       color: var(--vscode-descriptionForeground, #999);
       margin-top: 4px;
     }
-
-    .mcp-server-row {
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .mcp-server-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-
-    .mcp-server-name {
-      font-weight: 600;
-      flex: 1;
-    }
-
-    .catalog-header {
-      display: flex;
-      gap: 8px;
-      padding: 8px 0;
-      font-weight: 600;
-      font-size: 12px;
-      color: var(--vscode-descriptionForeground, #999);
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 4px;
-    }
   </style>
 </head>
 <body>
@@ -565,8 +385,6 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
     <nav class="sidebar">
       <button class="tab active" data-tab="general">General</button>
       <button class="tab" data-tab="model">Model</button>
-      <button class="tab" data-tab="apikeys">API Keys</button>
-      <button class="tab" data-tab="mcp">MCP</button>
       <button class="tab" data-tab="terminal">Terminal</button>
       <button class="tab" data-tab="about">About</button>
     </nav>
@@ -607,62 +425,9 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
       <div class="section" id="section-model">
         <h2>Model Visibility</h2>
         <p class="info-text">Toggle which models appear in the chat model dropdown. Changes take effect immediately.</p>
-        <div class="field">
-          <label>
-            <input type="checkbox" id="model-search-filter" />
-            Show search/filter box
-          </label>
-        </div>
         <div id="model-catalog"></div>
         <div class="spacer">
           <button id="save-model">Save Visibility</button>
-        </div>
-      </div>
-
-      <!-- API Keys -->
-      <div class="section" id="section-apikeys">
-        <h2>API Keys</h2>
-        <div id="apikeys-list"></div>
-        <div class="field spacer">
-          <label>Add Key</label>
-          <div class="field-row">
-            <input type="text" id="new-key-provider" placeholder="Provider (e.g., OpenRouter)" />
-            <input type="password" id="new-key-value" placeholder="sk-or-..." />
-            <button id="add-apikey">Add</button>
-          </div>
-        </div>
-        <div class="info-text spacer">
-          Keys stored in <code id="env-path-display">~/.hermes/.env</code>
-        </div>
-      </div>
-
-      <!-- MCP Servers -->
-      <div class="section" id="section-mcp">
-        <h2>MCP Servers</h2>
-        <div id="mcp-list"></div>
-        <div class="field spacer">
-          <h3 style="margin-bottom:8px; font-size:14px;">Add Server</h3>
-          <div class="field">
-            <label>Name</label>
-            <input type="text" id="mcp-name" placeholder="my-server" />
-          </div>
-          <div class="field">
-            <label>Transport</label>
-            <select id="mcp-transport">
-              <option value="stdio">Stdio (local process)</option>
-              <option value="sse">SSE (Server-Sent Events)</option>
-              <option value="http">HTTP</option>
-            </select>
-          </div>
-          <div class="field" id="mcp-command-field">
-            <label>Command</label>
-            <input type="text" id="mcp-command" placeholder="npx -y @hermes/mcp-server" />
-          </div>
-          <div class="field hidden" id="mcp-url-field">
-            <label>URL</label>
-            <input type="text" id="mcp-url" placeholder="https://..." />
-          </div>
-          <button id="add-mcp">Add Server</button>
         </div>
       </div>
 
