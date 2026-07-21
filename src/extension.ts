@@ -7,6 +7,9 @@ import { AcpClient } from './acpClient';
 import { PermissionRequestHandler, SessionManager } from './sessionManager';
 import { ChatPanelProvider } from './chatPanel';
 import { SettingsPanelProvider } from './settingsPanel';
+import { registerContextCommands } from './commands/ContextMenuCommands';
+import { requestPermission } from './PermissionApproval';
+import { showDiff, previewEdit } from './hosts/VscodeDiffViewProvider';
 
 const DEFAULT_SONNET_MODEL = 'claude-sonnet-4-6';
 const APPROVED_BINARIES_KEY = 'hermes.approvedBinaries';
@@ -236,28 +239,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
 
   const permissionHandler: PermissionRequestHandler = async (_method, params) => {
-    const allowOptionId = optionIdByIntent(params, 'allow');
-    const denyOptionId = optionIdByIntent(params, 'deny');
-    const allow = 'Allow Once';
-    const deny = 'Deny';
-    const choice = await vscode.window.showWarningMessage(
-      summarizePermissionRequest(params),
-      { modal: true },
-      allow,
-      deny,
-    );
+    const toolName = typeof (params as any)?.toolName === 'string' ? (params as any).toolName : 'an action';
+    const reason = typeof (params as any)?.reason === 'string' ? (params as any).reason : undefined;
+    const filePath = typeof (params as any)?.filePath === 'string' ? (params as any).filePath : undefined;
 
-    if (choice === allow && allowOptionId) {
-      outputChannel.appendLine('[security] permission granted once');
-      return { outcome: 'selected', optionId: allowOptionId };
+    // Use QuickPick-based permission UI
+    const selectedOption = await requestPermission({ toolName, reason, filePath });
+
+    if (!selectedOption || selectedOption.startsWith('deny')) {
+      outputChannel.appendLine(`[security] permission denied for ${toolName}`);
+      throw new Error('Permission denied by user');
     }
 
-    if (denyOptionId) {
-      outputChannel.appendLine('[security] permission denied');
-      return { outcome: 'selected', optionId: denyOptionId };
-    }
-
-    throw new Error('Permission denied by user');
+    outputChannel.appendLine(`[security] permission granted: ${selectedOption} for ${toolName}`);
+    return { outcome: 'selected', optionId: selectedOption };
   };
 
   const session = new SessionManager(client, line => outputChannel.appendLine(line), permissionHandler);
@@ -286,6 +281,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       webviewOptions: { retainContextWhenHidden: true },
     }),
   );
+
+  // Register context menu commands (right-click -> Hermes actions)
+  const sendToChat = (text: string) => {
+    panel.post({ type: 'statusBar' }); // nudge
+    // Queue the text as if the user typed it
+    panel.post({ type: 'append', text: `
+[Context] ${text}
+` });
+  };
+  const ctxDisposables = registerContextCommands(context, sendToChat);
+  context.subscriptions.push(...ctxDisposables);
 
   // Commands
   context.subscriptions.push(

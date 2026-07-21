@@ -1,116 +1,73 @@
-# Hermes AI Agent — VS Code Extension
+# Hermes AI — VS Code Extension
 
-VS Code sidebar for the [Hermes CLI](https://github.com/collinear-ai/hermes-agent) agent runtime. Streams chat, executes tools, manages sessions, and tracks context usage over the Agent Client Protocol (ACP).
-
-Requires Hermes CLI installed and authenticated. The extension spawns `hermes acp` as a local subprocess — no cloud proxy, no hosted backend.
+**Hermes AI** is a VS Code extension that brings the [Hermes Agent](https://hermes-agent.nousresearch.com) into your editor. Chat, configure, manage MCP servers, and let the agent edit your code — all through the ACP protocol.
 
 ## Features
 
-### Chat
-- Sidebar panel with streaming markdown rendering (DOMPurify-sanitized)
-- Extended thinking shown as gold status line
-- Inline image rendering from Hermes `MEDIA:/path` protocol
-- Copy buttons on code blocks
+- **AI Chat** — Stream conversations with Hermes in a sidebar panel
+- **Settings Panel** — 6-tab settings UI: General, Model, API Keys, MCP, Terminal, About
+- **Diff Preview** — See file changes before applying them
+- **Permission Control** — Rich approval UI for tool calls
+- **Context Menu** — Right-click → Explain, Fix, Improve code with Hermes
+- **Commit Generation** — Generate conventional commits from staged changes
+- **MCP Management** — Add, remove, test MCP servers from settings
+- **Keyboard Shortcuts** — Ctrl+` for chat, Ctrl+Shift+` for settings
 
-### Tool Use
-- Tool calls displayed with kind labels (Read, Edit, Bash, Search, Fetch) and file paths
-- Status: `✓` done, `⋯` running, `✗` error
-- Edited files auto-open in VS Code; reads open as preview tabs
-- Todo overlay from Hermes's todo tool
+## Installation
 
-### Skills
-- Skills picker (`✦` button) loads from `~/.hermes/skills/`
-- Multi-select — injected as advisory prefix in the prompt
+1. Install [Hermes Agent](https://hermes-agent.nousresearch.com) on your system
+2. Install this extension from the VSIX file
+3. Open the command palette (`Ctrl+Shift+P`) → **Hermes: Open Chat**
 
-### Slash Commands
-Grouped command menu (`/` button). Three dispatch modes: immediate execute, inline argument prompt, or confirmation dialog.
+### Auto-detection
 
-| Section | Commands |
-|---------|----------|
-| **Session** | `/title`, `/new`, `/retry`, `/compact`, `/save` |
-| **Info** | `/context`, `/usage`, `/tools`, `/help` |
-| **Config** | `/yolo` (auto-approve dangerous ops, red glow), `/reasoning` |
-| **Danger** | `/reset` (with confirmation) |
+The extension auto-detects Hermes from:
+- The configured `hermes.path` setting
+- System PATH
+- Known locations (`~/.local/bin/hermes`, etc.)
 
-Slash command responses render as centered system messages, not conversation bubbles.
+## Setup
 
-### Context & Attachments
-- Active file, selection, and open tabs sent automatically
-- File attachment via `⊕` button, drag & drop, or `Ctrl+V` paste
-- Files sent as path references — Hermes reads on demand
+Open the Hermes sidebar (click the Hermes icon in the activity bar), then click the **Settings** tab to configure:
 
-### Sessions
-- Persistent across VS Code reloads (stored in `workspaceState`)
-- Session picker: switch, create, rename, delete
-- Auto-titled from first user message
-- ACP session ID stored for context resume
+- **General**: Binary path, auto-connect, debug logging
+- **Model**: Provider, model, base URL, max turns
+- **API Keys**: Add/remove API keys with masked display
+- **MCP**: Add/remove/test MCP servers
+- **Terminal**: Backend, working directory, timeout
+- **About**: Version info, config paths, doctor command
 
-### Models
-- Anthropic Claude + OpenAI Codex in grouped picker
-- Switch via header dropdown or `/model provider:model-id`
-- Dynamic catalog from `~/.hermes/models_dev_cache.json`
+## Usage
 
-### Token Tracking
-- Context usage displayed as `Xk / 1M` with progress bar
-- Color warnings at 70% (gold) and 90% (red)
+| Action | How |
+|---|---|
+| Open chat | Click Hermes icon → Chat tab, or `Ctrl+\`` |
+| Open settings | Click Hermes icon → Settings tab, or `Ctrl+Shift+\`` |
+| Add code to chat | Select code → right-click → **Hermes: Add to Chat** |
+| Explain code | Select code → right-click → **Hermes: Explain Code** |
+| Fix code | Select code → right-click → **Hermes: Fix Code** |
+| Generate commit | Click Hermes button in SCM title bar |
 
-### Queue & Interrupt
-- Send follow-ups while busy (queued)
-- New messages cancel the current turn
-- Gold glow on composer while agent is working
+## Development
 
-## Requirements
+### Build
 
-- [Hermes CLI](https://github.com/collinear-ai/hermes-agent) installed (`pip install hermes-agent`)
-- Hermes authenticated (`hermes setup`)
-- VS Code 1.85+
-- Remote SSH: runs on the workspace/server side (`extensionKind: ["workspace"]`)
-
-## Getting Started
-
-1. `pip install hermes-agent && hermes setup`
-2. Install extension from Marketplace or `.vsix`
-3. Open Hermes panel from the activity bar
-4. Send a message
-
-## Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `hermes.path` | `hermes` | Path to the Hermes binary (machine scope) |
-| `hermes.debugLogs` | `false` | ACP diagnostic logs in the Output channel |
-
-## Architecture
-
-```
-Extension Host (Node.js)
-├── extension.ts       — activation, wiring
-├── acpClient.ts       — JSON-RPC 2.0 over stdio
-├── sessionManager.ts  — ACP session lifecycle, streaming dedup
-├── sessionStore.ts    — workspaceState persistence
-├── chatPanel.ts       — WebviewViewProvider, message dispatch
-├── htmlTemplate.ts    — HTML/CSS builder
-├── protocol.ts        — typed ACP parsing
-├── types.ts           — shared type definitions
-├── modelCatalog.ts    — model menu loader
-└── skillCatalog.ts    — skill directory loader
-
-Webview (sandboxed)
-├── main.ts      — event handlers, send logic
-├── state.ts     — state factory
-├── renderers.ts — markdown, messages, todo overlay
-└── menus.ts     — dropdowns, status bar
+```bash
+npm install
+npm run build    # production build (extension + chat webview + settings webview)
+npm run dev      # development watch mode
 ```
 
-Communication: JSON-RPC 2.0 over stdio to `hermes acp` subprocess. Webview sandboxed with CSP + DOMPurify. Media isolated to extension storage.
+### Package
 
-## Credits
+```bash
+npm run package  # creates hermes-ai-1.0.0.vsix
+```
 
-- [Hermes Agent](https://github.com/collinear-ai/hermes-agent) by [Nous Research](https://nousresearch.com/) — the AI agent runtime this extension connects to
-- [Agent Client Protocol (ACP)](https://agentclientprotocol.com/) — the communication protocol between extension and agent
-- [marked](https://github.com/markedjs/marked) — Markdown parsing for chat rendering
-- [DOMPurify](https://github.com/cure53/DOMPurify) — HTML sanitization for agent-generated content
-- [VS Code Extension API](https://code.visualstudio.com/api) — WebviewViewProvider, workspace state, editor integration
+## Repository
+
+- **GitHub**: <https://github.com/benkfie/hermes-ai>
+- **Upstream**: <https://github.com/joaompfp/hermes-vscode> (v3.0.0 fork base)
 
 ## License
 

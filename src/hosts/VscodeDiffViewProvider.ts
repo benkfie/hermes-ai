@@ -1,0 +1,97 @@
+/**
+ * VscodeDiffViewProvider — Shows side-by-side diffs for agent file edits.
+ * Simplified version adapted from Cline's DiffViewProvider pattern.
+ */
+import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+
+export interface DiffEdit {
+  filePath: string;
+  originalContent: string;
+  newContent: string;
+  title?: string;
+}
+
+/**
+ * Open a VS Code diff editor showing changes between original and new content.
+ * Uses a temp file for the "modified" side + the original as "original" side.
+ */
+export async function showDiff(edit: DiffEdit): Promise<boolean> {
+  const originalUri = vscode.Uri.file(edit.filePath).with({ scheme: 'file' });
+
+  // Write new content to a temp file for the diff view
+  const tmpDir = path.join(
+    path.dirname(edit.filePath),
+    '.hermes-diffs',
+  );
+  fs.mkdirSync(tmpDir, { recursive: true });
+
+  const tmpFile = path.join(tmpDir, path.basename(edit.filePath) + '.hermes-edit');
+  fs.writeFileSync(tmpFile, edit.newContent, 'utf8');
+  const modifiedUri = vscode.Uri.file(tmpFile);
+
+  const title = edit.title
+    ? `Hermes: ${edit.title} — ${path.basename(edit.filePath)}`
+    : `Hermes Diff: ${path.basename(edit.filePath)}`;
+
+  // Open the diff editor
+  await vscode.commands.executeCommand('vscode.diff', originalUri, modifiedUri, title);
+
+  // Ask user to accept or reject
+  const accept = 'Accept Changes';
+  const reject = 'Reject';
+  const choice = await vscode.window.showInformationMessage(
+    `Apply these changes to ${path.basename(edit.filePath)}?`,
+    { modal: true },
+    accept,
+    reject,
+  );
+
+  if (choice === accept) {
+    // Apply the changes
+    fs.writeFileSync(edit.filePath, edit.newContent, 'utf8');
+    // Clean up temp file
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    return true;
+  }
+
+  // Rejected — clean up
+  try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+  return false;
+}
+
+/**
+ * Close any open diff editors from Hermes.
+ */
+export async function closeAllDiffs(): Promise<void> {
+  // Close editors showing .hermes-edit files and diff editors
+  const tabs = vscode.window.tabGroups.all.flatMap(g => g.tabs);
+  for (const tab of tabs) {
+    if (tab.label.includes('.hermes-edit') || tab.label.startsWith('Hermes Diff:')) {
+      await vscode.window.tabGroups.close(tab);
+    }
+  }
+}
+
+/**
+ * Show a simple edit preview using VS Code's built-in diff.
+ */
+export async function previewEdit(
+  filePath: string,
+  newContent: string,
+  description: string,
+): Promise<boolean> {
+  if (!fs.existsSync(filePath)) {
+    // Create the file if it doesn't exist
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, '', 'utf8');
+  }
+
+  return showDiff({
+    filePath,
+    originalContent: fs.readFileSync(filePath, 'utf8'),
+    newContent,
+    title: description,
+  });
+}

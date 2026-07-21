@@ -60,6 +60,30 @@
       {
         "command": "hermes.openSettings",
         "title": "Hermes: Open Settings"
+      },
+      {
+        "command": "hermes.addToChat",
+        "title": "Hermes: Add to Chat"
+      },
+      {
+        "command": "hermes.explainCode",
+        "title": "Hermes: Explain Code"
+      },
+      {
+        "command": "hermes.fixCode",
+        "title": "Hermes: Fix Code"
+      },
+      {
+        "command": "hermes.improveCode",
+        "title": "Hermes: Improve Code"
+      },
+      {
+        "command": "hermes.addTerminalOutput",
+        "title": "Hermes: Add Terminal Output to Chat"
+      },
+      {
+        "command": "hermes.generateCommitMsg",
+        "title": "Hermes: Generate Commit Message"
       }
     ],
     "viewsContainers": {
@@ -105,7 +129,55 @@
           "description": "Automatically connect to Hermes when VS Code starts"
         }
       }
-    }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "hermes.addToChat",
+          "group": "Hermes@1",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "hermes.explainCode",
+          "group": "Hermes@2",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "hermes.fixCode",
+          "group": "Hermes@3",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "hermes.improveCode",
+          "group": "Hermes@4",
+          "when": "editorHasSelection"
+        }
+      ],
+      "terminal/context": [
+        {
+          "command": "hermes.addTerminalOutput",
+          "group": "Hermes@1"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "hermes.generateCommitMsg",
+          "group": "navigation@1"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "hermes.openChat",
+        "key": "ctrl+`",
+        "mac": "cmd+`"
+      },
+      {
+        "command": "hermes.openSettings",
+        "key": "ctrl+shift+`",
+        "mac": "cmd+shift+`"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
