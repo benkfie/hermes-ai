@@ -36,10 +36,64 @@ type SettingsResponse =
  */
 function loadModelCatalog(): Array<{ provider: string; modelId: string; name: string; visible: boolean }> {
   const cachePath = path.join(os.homedir(), '.hermes', 'models_dev_cache.json');
+  const envPath = path.join(os.homedir(), '.hermes', '.env');
+  
   if (!fs.existsSync(cachePath)) {
     return [];
   }
+  
   try {
+    // Read .env to find which providers have API keys configured (not commented out)
+    const activeProviderPrefixes: Set<string> = new Set();
+    let localBaseUrl: string | null = null;
+    
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      for (const line of envContent.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        
+        // Match _API_KEY or _BASE_URL entries with actual values
+        const match = trimmed.match(/^([A-Z_]+?)(?:_API_KEY|_BASE_URL)=(.+)/);
+        if (match && match[2].trim()) {
+          activeProviderPrefixes.add(match[1]);
+        }
+        if (trimmed.startsWith('LM_BASE_URL=') && trimmed.split('=', 2)[1]?.trim()) {
+          localBaseUrl = trimmed.split('=', 2)[1].trim();
+        }
+      }
+    }
+    
+    // Map env var prefixes to cache provider IDs
+    const envToCacheMap: Record<string, string[]> = {
+      'OPENROUTER': ['openrouter'],
+      'GOOGLE': ['google'],
+      'NOVITA': ['novitaai'],
+      'OLLAMA': ['ollama-cloud'],
+      'GLM': ['z-ai', 'z-ai-coding-plan'],
+      'KIMI': ['moonshot-ai', 'moonshot-ai-china', 'kimi-for-coding'],
+      'MINIMAX': ['minimax-io', 'minimaxi-com', 'minimax-token-plan-minimax-io', 'minimax-token-plan-minimaxi-com'],
+      'XIAOMI': ['xiaomi', 'xiaomi-token-plan-europe', 'xiaomi-token-plan-china', 'xiaomi-token-plan-singapore'],
+      'HF': ['hugging-face'],
+      'ANTHROPIC': ['anthropic'],
+      'OPENAI': ['openai'],
+      'OPENCODE_ZEN': ['opencode-zen'],
+      'OPENCODE_GO': ['opencode-go'],
+      'ARCEEAI': ['arcee-ai'],
+    };
+    
+    // Collect active cache provider IDs
+    const activeCacheIds: Set<string> = new Set();
+    for (const prefix of activeProviderPrefixes) {
+      const cacheIds = envToCacheMap[prefix];
+      if (cacheIds) {
+        for (const id of cacheIds) {
+          activeCacheIds.add(id);
+        }
+      }
+    }
+    
+    // Read the cache
     const raw = fs.readFileSync(cachePath, 'utf8');
     const cache = JSON.parse(raw) as Record<string, { name?: string; models?: Record<string, { id: string; name?: string }> }>;
     
@@ -52,7 +106,11 @@ function loadModelCatalog(): Array<{ provider: string; modelId: string; name: st
     
     const results: Array<{ provider: string; modelId: string; name: string; visible: boolean }> = [];
     
-    for (const [providerId, providerData] of Object.entries(cache)) {
+    // Add models from active cached providers
+    for (const providerId of activeCacheIds) {
+      const providerData = cache[providerId];
+      if (!providerData) continue;
+      
       const models = providerData?.models;
       if (!models || Object.keys(models).length === 0) continue;
       
@@ -64,8 +122,24 @@ function loadModelCatalog(): Array<{ provider: string; modelId: string; name: st
           provider: providerName,
           modelId,
           name: modelData.name || modelId,
-          visible: visibility[key] ?? true,  // default visible
+          visible: visibility[key] ?? true,
         });
+      }
+    }
+    
+    // Add local LM Studio models if base URL is configured
+    if (localBaseUrl) {
+      const lmStudio = cache['lmstudio'];
+      if (lmStudio?.models) {
+        for (const [modelId, modelData] of Object.entries(lmStudio.models)) {
+          const key = 'lmstudio::' + modelId;
+          results.push({
+            provider: 'LM Studio (Local)',
+            modelId,
+            name: modelData.name || modelId,
+            visible: visibility[key] ?? true,
+          });
+        }
       }
     }
     
