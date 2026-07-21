@@ -7,8 +7,12 @@
 ## Features
 
 - **AI Chat** — Stream conversations with Hermes in a sidebar panel
-- **Multi-Model Selector** — Pick any model from your Hermes config; includes a search box
-- **Model Visibility** — Toggle which models appear in the chat selector (searchable list, changes apply instantly to the dropdown)
+- **Live Terminals** — Bash/execute tools render as full terminal blocks showing the command and streaming output
+- **Diff Preview** — Side-by-side diff with Accept/Reject + feedback when rejecting agent edits
+- **Thinking Display** — Agent reasoning streams in a full-height scrollable block
+- **Busy Indicator** — Reliable Stop/Play buttons; no more silent background processing
+- **Multi-Model Selector** — Pick any model, changes reflect immediately in the UI
+- **Model Visibility** — Toggle which models appear in the chat selector
 - **Settings Panel** — 6-tab settings UI: General, Model, API Keys, MCP, Terminal, About
 - **Diff Preview** — See file changes before applying them
 - **Permission Control** — Rich approval UI for tool calls
