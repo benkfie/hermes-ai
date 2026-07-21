@@ -434,6 +434,7 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
     .spacer { margin-top: 20px; }
 
     .hidden { display: none !important; }
+    .search-hidden { display: none !important; }
 
     .toast {
       position: fixed;

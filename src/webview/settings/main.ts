@@ -236,21 +236,23 @@ document.getElementById('browse-hermes')?.addEventListener('click', () => {
 });
 
 // --- Model visibility search --------------------------------
+// Uses a CSS class (.search-hidden) instead of touching inline display,
+// so the labels keep their inline `display:block` and never bunch up.
 const modelVisSearch = document.getElementById('model-vis-search') as HTMLInputElement;
 if (modelVisSearch) {
   modelVisSearch.addEventListener('input', () => {
-    const q = modelVisSearch.value.toLowerCase();
+    const q = modelVisSearch.value.toLowerCase().trim();
     const container = document.getElementById('model-catalog');
     if (!container) return;
-    container.querySelectorAll('.model-list label').forEach(label => {
-      const text = label.textContent?.toLowerCase() || '';
-      (label as HTMLElement).style.display = text.includes(q) ? '' : 'none';
-    });
     container.querySelectorAll('.provider-section').forEach(section => {
-      const hasVisible = section.querySelector('.model-list label:not([style*="display: none"])');
-      const header = section.querySelector('.provider-header');
-      const list = section.querySelector('.model-list');
-      (section as HTMLElement).style.display = hasVisible ? '' : 'none';
+      let anyVisible = false;
+      section.querySelectorAll('.model-list label').forEach(label => {
+        const text = (label.textContent || '').toLowerCase();
+        const match = text.includes(q);
+        (label as HTMLElement).classList.toggle('search-hidden', !match);
+        if (match) anyVisible = true;
+      });
+      (section as HTMLElement).classList.toggle('search-hidden', !anyVisible);
     });
   });
 }
