@@ -201,7 +201,18 @@ modelBtnHeader.addEventListener('click', (e) => {
 modelMenu.addEventListener('click', (e) => {
   const opt = (e.target as HTMLElement).closest<HTMLElement>('.model-option');
   if (!opt?.dataset.command) return;
-  closeFn(); vscode.postMessage({ type: 'switchModel', model: opt.dataset.command });
+  closeFn();
+
+  const cmd = opt.dataset.command;
+  if (cmd === '__custom__') {
+    // Prompt user to type a model ID
+    const customModel = prompt('Enter model ID (e.g., "openai/gpt-4.1"):');
+    if (customModel && customModel.trim()) {
+      vscode.postMessage({ type: 'switchModel', model: customModel.trim() });
+    }
+  } else {
+    vscode.postMessage({ type: 'switchModel', model: cmd });
+  }
 });
 
 // Slash-command menu (hybrid dispatch: execute / confirm / prompt-for-arg)
