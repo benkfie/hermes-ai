@@ -11,9 +11,8 @@
       "outFiles": [
         "${workspaceFolder}/dist/**/*.js"
       ],
-      "preLaunchTask": "npm: dev",
-      "sourceMaps": true,
-      "trace": true
+      "preLaunchTask": "npm: build",
+      "sourceMaps": true
     }
   ]
 }
