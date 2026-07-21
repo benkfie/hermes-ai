@@ -496,16 +496,31 @@ window.addEventListener('message', (e: MessageEvent) => {
       const statusIcon = isDone ? '✓' : isError ? '✗' : '⋯';
       const statusClass = isDone ? ' done' : isError ? ' error' : '';
 
-      // Detect terminal/bash/shell tools by kind OR by tool name prefix
-      const isTerminal = msg.toolKind === 'execute'
+      // Always store the command for any tool that could produce output,
+      // so the update handler can create a terminal block later.
+      if (msg.toolName && msg.toolCallId) {
+        const cmd = msg.toolName.replace(/^(Bash|Terminal|Shell|Command|Execute|Run):\s*/i, '').trim() || msg.toolName;
+        S.toolCommandMap.set(msg.toolCallId, cmd);
+      }
+
+      // Terminal detection: broad match — any tool producing output that
+      // isn't explicitly read/search/fetch/think gets a terminal block.
+      const isNonTerminal = msg.toolKind === 'read'
+        || msg.toolKind === 'search'
+        || msg.toolKind === 'fetch'
+        || msg.toolKind === 'think'
+        || msg.toolKind === 'delete'
+        || msg.toolKind === 'move';
+      const hasOutput = !!(msg as any).toolOutput;
+      const isTerminal = !isNonTerminal && (hasOutput
+        || msg.toolKind === 'execute'
         || msg.toolKind === 'bash'
         || msg.toolKind === 'terminal'
         || msg.toolKind === 'shell'
-        || /^(Bash|Terminal|Shell|Command):/i.test(msg.toolName ?? '');
+        || /bash|terminal|shell|command|execute|run|cmd|write|edit|patch/i.test(msg.toolName ?? ''));
 
       if (isTerminal && msg.toolName) {
-        const cmd = msg.toolName.replace(/^(Bash|Terminal|Shell|Command):\s*/i, '').trim() || msg.toolName;
-        if (msg.toolCallId) S.toolCommandMap.set(msg.toolCallId, cmd);
+        const cmd = S.toolCommandMap.get(msg.toolCallId ?? '') || msg.toolName;
         renderTerminalBlock(messagesEl, msg.toolCallId ?? '', cmd, (msg as any).toolOutput ?? '', isDone);
       } else {
         const toolEl = appendDiv(messagesEl, 'msg tool');

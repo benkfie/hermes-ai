@@ -107,18 +107,28 @@ export function parseToolCallUpdate(update: RawUpdate): ParsedToolCallUpdate {
 
   const todoState = extractTodoFromUpdate(update);
 
-  // Extract terminal output from tool_call_update
+  // Extract terminal output from tool_call_update (robust check of content blocks)
   let toolOutput: string | undefined;
   const rawOut = update.rawOutput ?? (update as RawUpdate).raw_output;
-  if (typeof rawOut === 'string') toolOutput = rawOut;
-  else if (typeof update.output === 'string') toolOutput = update.output;
-  else {
-    const blocks = update.content as { type?: string; text?: string }[] | undefined;
+  if (typeof rawOut === 'string' && rawOut.trim()) {
+    toolOutput = rawOut;
+  } else if (typeof update.output === 'string' && update.output.trim()) {
+    toolOutput = update.output;
+  } else {
+    // ACP blocks can have nested content objects (block.content.text) or direct text fields (block.text)
+    const blocks = update.content as any[];
     if (Array.isArray(blocks)) {
-      const texts = blocks.filter(
-        b => b.type === 'text' && typeof b.text === 'string'
-      ).map(b => (b as { type: string; text: string }).text);
-      if (texts.length > 0) toolOutput = texts.join('\n');
+      const texts: string[] = [];
+      for (const b of blocks) {
+        if (!b) continue;
+        const txt = b.text || b.content?.text;
+        if (typeof txt === 'string' && txt.trim()) {
+          texts.push(txt);
+        }
+      }
+      if (texts.length > 0) {
+        toolOutput = texts.join('\n');
+      }
     }
   }
 

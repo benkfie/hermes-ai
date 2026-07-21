@@ -134,3 +134,7 @@ and installs in one step. Then **Reload Window** in the editor.)
 ## License
 
 MIT
+
+---
+
+*Test comment: terminal blocks and diff system verified.*
