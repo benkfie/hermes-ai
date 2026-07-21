@@ -1,12 +1,10 @@
 /**
- * Model catalog — loads available models for the model switcher dropdown.
- * Reads from Hermes config to determine the active provider and model,
- * then builds appropriate model groups.
+ * Model catalog — dynamically loads available models from the Hermes config
+ * and model cache. Shows whatever providers the user has configured.
  */
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { execSync } from 'child_process';
 
 export interface ModelMenuItem {
   id: string;
@@ -19,50 +17,10 @@ export interface ModelMenuGroup {
   items: ModelMenuItem[];
 }
 
-// Common OpenRouter models (user's default provider)
-const OPENROUTER_MODEL_IDS = [
-  'deepseek/deepseek-v4-flash',
-  'deepseek/deepseek-v4-pro',
-  'google/gemma-4-26b-a4b-it',
-  'google/gemini-2.5-pro',
-  'google/gemini-2.5-flash',
-  'anthropic/claude-sonnet-4-6',
-  'anthropic/claude-opus-4-6',
-  'anthropic/claude-haiku-4-5-20251001',
-  'openai/gpt-4.1',
-  'openai/gpt-4.1-mini',
-  'openai/gpt-5.4',
-  'meta-llama/llama-4-maverick',
-  'meta-llama/llama-4-scout',
-  'mistral/mistral-large',
-  'qwen/qwen3-235b-a22b',
-];
-
-// Label overrides for cleaner display
-const LABEL_OVERRIDES: Record<string, string> = {
-  'deepseek/deepseek-v4-flash': 'DeepSeek V4 Flash (fast)',
-  'deepseek/deepseek-v4-pro': 'DeepSeek V4 Pro (smart)',
-  'google/gemma-4-26b-a4b-it': 'Gemma 4 26B',
-  'google/gemini-2.5-pro': 'Gemini 2.5 Pro',
-  'google/gemini-2.5-flash': 'Gemini 2.5 Flash',
-  'anthropic/claude-sonnet-4-6': 'Claude Sonnet 4.6',
-  'anthropic/claude-opus-4-6': 'Claude Opus 4.6',
-  'anthropic/claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
-  'openai/gpt-4.1': 'GPT-4.1',
-  'openai/gpt-4.1-mini': 'GPT-4.1 Mini',
-  'openai/gpt-5.4': 'GPT-5.4',
-  'meta-llama/llama-4-maverick': 'Llama 4 Maverick',
-  'meta-llama/llama-4-scout': 'Llama 4 Scout',
-  'mistral/mistral-large': 'Mistral Large',
-  'qwen/qwen3-235b-a22b': 'Qwen3 235B',
-};
-
-function formatLabel(modelId: string): string {
-  return LABEL_OVERRIDES[modelId] || modelId;
-}
+// ── Config parsing ─────────────────────────────────
 
 /**
- * Read the currently configured model from Hermes config.
+ * Read the currently active model from config.yaml.
  */
 function readCurrentModel(): string {
   try {
@@ -79,13 +37,11 @@ function readCurrentModel(): string {
 
       const inlineValue = modelMatch[2].trim();
       if (inlineValue) {
-        // Inline dict — try to extract 'default'
         const defaultMatch = /'default':\s*'([^']*)'/.exec(inlineValue);
         if (defaultMatch) return defaultMatch[1];
         return inlineValue;
       }
 
-      // Multi-line: scan children for 'default:'
       baseIndent = modelMatch[1].length;
       for (let j = i + 1; j < lines.length; j++) {
         const childLine = lines[j];
@@ -97,17 +53,138 @@ function readCurrentModel(): string {
       }
       break;
     }
-  } catch {
-    // Config not readable
-  }
+  } catch { /* ignore */ }
   return '';
 }
 
+/**
+ * Read the configured provider name from config.yaml.
+ * e.g. "custom:local-(127.0.0.1:1234)" or "openrouter"
+ */
+function readProviderName(): string {
+  try {
+    const configPath = path.join(os.homedir(), '.hermes', 'config.yaml');
+    const content = fs.readFileSync(configPath, 'utf8');
+    const match = /'provider':\s*'([^']+)'/.exec(content);
+    if (match) return match[1];
+  } catch { /* ignore */ }
+  return '';
+}
+
+// ── Model cache ────────────────────────────────────
+
+interface CacheEntry {
+  id: string;
+  name?: string;
+  models?: Record<string, { id: string; name?: string }>;
+}
+
+interface ModelCache {
+  [providerId: string]: CacheEntry;
+}
+
+function readModelCache(): ModelCache | null {
+  const cachePath = path.join(os.homedir(), '.hermes', 'models_dev_cache.json');
+  try {
+    const raw = fs.readFileSync(cachePath, 'utf8');
+    return JSON.parse(raw) as ModelCache;
+  } catch {
+    return null;
+  }
+}
+
+// ── Env parsing (which providers have keys) ─────────
+
+function readConfiguredProviders(): Set<string> {
+  const providers = new Set<string>();
+  const envPath = path.join(os.homedir(), '.hermes', '.env');
+  try {
+    const content = fs.readFileSync(envPath, 'utf8');
+    const lines = content.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = trimmed.substring(0, eqIdx).trim().toUpperCase();
+      const value = trimmed.substring(eqIdx + 1).trim();
+      if (!value || value === '(not set)') continue;
+
+      // Map env var names to provider ids
+      if (key === 'OPENROUTER_API_KEY') providers.add('openrouter');
+      else if (key === 'ANTHROPIC_API_KEY') providers.add('anthropic');
+      else if (key === 'OPENAI_API_KEY') providers.add('openai');
+      else if (key === 'GEMINI_API_KEY' || key === 'GOOGLE_API_KEY') providers.add('gemini');
+      else if (key === 'DEEPSEEK_API_KEY') providers.add('deepseek');
+      else if (key === 'MISTRAL_API_KEY') providers.add('mistral');
+      else if (key === 'GROQ_API_KEY') providers.add('groq');
+      else if (key === 'COHERE_API_KEY') providers.add('cohere');
+      else if (key === 'TOGETHER_API_KEY') providers.add('together');
+      else if (key === 'FIREWORKS_API_KEY') providers.add('fireworks');
+      else if (key === 'PERPLEXITY_API_KEY') providers.add('perplexity');
+    }
+  } catch { /* ignore */ }
+
+  // Also add the current active provider
+  const active = readProviderName();
+  if (active) {
+    // Strip "custom:" prefix if present
+    const clean = active.startsWith('custom:') ? active.substring(7) : active;
+    providers.add(clean);
+  }
+
+  // Also add local if there's a base_url pointing to localhost
+  try {
+    const configPath = path.join(os.homedir(), '.hermes', 'config.yaml');
+    const content = fs.readFileSync(configPath, 'utf8');
+    if (content.includes("'base_url': 'http://127.0.0.1") || content.includes("'base_url': 'http://localhost")) {
+      providers.add('local');
+    }
+  } catch { /* ignore */ }
+
+  return providers;
+}
+
+// ── Label helpers ──────────────────────────────────
+
+const PROVIDER_LABELS: Record<string, string> = {
+  openrouter: 'OpenRouter',
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  gemini: 'Gemini',
+  deepseek: 'DeepSeek',
+  mistral: 'Mistral',
+  groq: 'Groq',
+  cohere: 'Cohere',
+  together: 'Together AI',
+  fireworks: 'Fireworks',
+  perplexity: 'Perplexity',
+  local: 'Local',
+};
+
+function providerLabel(providerId: string): string {
+  return PROVIDER_LABELS[providerId] || providerId;
+}
+
+function formatLabel(modelId: string, record?: { id: string; name?: string }): string {
+  // Use the cache's name if available
+  if (record?.name) return record.name;
+  // Otherwise clean up the model ID
+  return modelId
+    .replace(/^.*\//, '')        // strip provider prefix (openrouter/, anthropic/, etc.)
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── Build the model menu ───────────────────────────
+
 export function loadHermesModelGroups(): ModelMenuGroup[] {
   const currentModel = readCurrentModel();
+  const cache = readModelCache();
+  const configuredProviders = readConfiguredProviders();
   const groups: ModelMenuGroup[] = [];
 
-  // Always add a "Current" group showing the active model
+  // 1. Current model group
   if (currentModel) {
     groups.push({
       group: 'Current',
@@ -119,17 +196,46 @@ export function loadHermesModelGroups(): ModelMenuGroup[] {
     });
   }
 
-  // Add OpenRouter group (most common provider for Hermes users)
-  groups.push({
-    group: 'OpenRouter',
-    items: OPENROUTER_MODEL_IDS.map(id => ({
-      id,
-      label: formatLabel(id),
-      command: id,
-    })),
-  });
+  // 2. For each configured provider, show its models from the cache
+  for (const providerId of configuredProviders) {
+    const providerCache = cache?.[providerId];
+    const models = providerCache?.models;
 
-  // Always add a Custom group for manual model entry
+    if (models && Object.keys(models).length > 0) {
+      // Sort: prefer known model families first
+      const items = Object.entries(models)
+        .sort(([, a], [, b]) => {
+          const aName = (a.name || '').toLowerCase();
+          const bName = (b.name || '').toLowerCase();
+          return aName.localeCompare(bName);
+        })
+        .map(([id, record]) => ({
+          id,
+          label: formatLabel(id, record),
+          command: id,
+        }));
+
+      if (items.length > 0) {
+        groups.push({
+          group: providerLabel(providerId),
+          items: items.length > 20 ? items.slice(0, 20) : items,
+        });
+      }
+    }
+  }
+
+  // 3. If no providers detected, show a helpful message + custom
+  if (groups.length <= 1) {
+    groups.push({
+      group: 'No providers configured?',
+      items: [
+        { id: 'setup', label: 'Run: hermes model', command: 'setup' },
+        { id: 'custom', label: 'Type a model ID...', command: '__custom__' },
+      ],
+    });
+  }
+
+  // 4. Always add Custom entry at the bottom
   groups.push({
     group: 'Custom',
     items: [
