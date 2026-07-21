@@ -52,6 +52,7 @@ export interface SessionUpdateEvent {
   toolDetail?: string;
   toolKind?: string;
   toolLocations?: string[];
+  toolOutput?: string;
   todoState?: TodoState;
   done?: boolean;
   error?: string;
@@ -79,6 +80,7 @@ export interface ToWebview {
   toolDetail?: string;
   toolKind?: string;
   toolLocations?: string[];
+  toolOutput?: string;
   todoState?: TodoState;
   status?: string;
   active?: boolean;

@@ -29,6 +29,9 @@ export interface WebviewState {
   // Skills
   selectedSkillNames: Set<string>;
   skillGroupsData: { category: string; skills: { name: string; description: string }[] }[];
+
+  // Terminal tracking for tool calls
+  terminalBlocks: Map<string, HTMLElement>;
 }
 
 export function createInitialState(): WebviewState {
@@ -49,5 +52,6 @@ export function createInitialState(): WebviewState {
     prevQueueCount: 0,
     selectedSkillNames: new Set(),
     skillGroupsData: [],
+    terminalBlocks: new Map(),
   };
 }

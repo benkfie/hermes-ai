@@ -250,6 +250,7 @@ export class SessionManager {
         event.toolKind = parsed.kind;
         if (parsed.locations.length) event.toolLocations = parsed.locations;
         if (parsed.detail) event.toolDetail = parsed.detail;
+        if (parsed.toolOutput) (event as any).toolOutput = parsed.toolOutput;
         if (parsed.todoState) {
           event.todoState = parsed.todoState;
           this.log(`[session] todo tool_call: ${parsed.todoState.todos.length} items`);
@@ -263,6 +264,7 @@ export class SessionManager {
         event.toolCallId = parsed.toolCallId;
         event.toolStatus = parsed.status;
         event.toolTitle = ''; // signal: update, not new call
+        if (parsed.toolOutput) (event as any).toolOutput = parsed.toolOutput;
         if (parsed.todoState) {
           event.todoState = parsed.todoState;
           this.log(`[session] todo update: ${parsed.todoState.todos.length} items`);
@@ -282,6 +284,10 @@ export class SessionManager {
         const title = parseSessionInfoUpdate(update);
         if (!title) return;
         event.sessionTitle = title;
+        // Also forward the model if the adapter provides it
+        if (update.model && typeof update.model === 'string') {
+          (event as any).model = update.model;
+        }
         break;
       }
 

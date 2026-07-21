@@ -61,6 +61,7 @@ export interface ParsedToolCall {
   locations: string[];
   detail?: string;
   todoState?: TodoState;
+  toolOutput?: string;
 }
 
 /** Parse a tool_call update into typed fields. */
@@ -96,6 +97,7 @@ export interface ParsedToolCallUpdate {
   toolCallId?: string;
   status: string;
   todoState?: TodoState;
+  toolOutput?: string;
 }
 
 /** Parse a tool_call_update, checking for todo JSON in output. */
@@ -105,7 +107,22 @@ export function parseToolCallUpdate(update: RawUpdate): ParsedToolCallUpdate {
 
   const todoState = extractTodoFromUpdate(update);
 
-  return { toolCallId, status, todoState };
+  // Extract terminal output from tool_call_update
+  let toolOutput: string | undefined;
+  const rawOut = update.rawOutput ?? (update as RawUpdate).raw_output;
+  if (typeof rawOut === 'string') toolOutput = rawOut;
+  else if (typeof update.output === 'string') toolOutput = update.output;
+  else {
+    const blocks = update.content as { type?: string; text?: string }[] | undefined;
+    if (Array.isArray(blocks)) {
+      const texts = blocks.filter(
+        b => b.type === 'text' && typeof b.text === 'string'
+      ).map(b => (b as { type: string; text: string }).text);
+      if (texts.length > 0) toolOutput = texts.join('\n');
+    }
+  }
+
+  return { toolCallId, status, todoState, toolOutput };
 }
 
 // ── Todo detection ───────────────────────────────────

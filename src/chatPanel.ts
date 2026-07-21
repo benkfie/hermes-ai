@@ -13,6 +13,7 @@ import { loadHermesModelGroups, ModelMenuGroup } from './modelCatalog';
 import { loadHermesSkills, SkillGroup } from './skillCatalog';
 import { buildChatHtml, escapeHtml } from './htmlTemplate';
 import type { StoredMessage, ToWebview, FromWebview } from './types';
+import { showDiff } from './hosts/VscodeDiffViewProvider';
 
 export class ChatPanelProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = 'hermes-ai.chatView';
@@ -30,6 +31,8 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
   private selectedSkills: string[] = [];
   private attachedFiles: { name: string; path: string }[] = [];
   private toolCallLocations = new Map<string, { kind: string; paths: string[] }>();
+  /** Snapshot file contents before agent edits them (for diff display). */
+  private editSnapshots = new Map<string, string>();
   private readonly mediaRoot: string;
 
   constructor(
@@ -96,15 +99,33 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
       }
       if (event.toolTitle !== undefined) {
         if (event.toolTitle === '' && event.toolCallId) {
-          // tool_call_update — status change for existing tool
-          this.post({ type: 'toolCall', toolCallId: event.toolCallId, toolStatus: event.toolStatus });
+          // tool_call_update — status change + output for existing tool
+          this.post({
+            type: 'toolCall',
+            toolCallId: event.toolCallId,
+            toolStatus: event.toolStatus,
+            toolOutput: (event as any).toolOutput,
+          });
 
-          // Open edited/read files in VS Code editor on completion
+          // Open edited/read files + show diff on completion
           if (event.toolStatus === 'completed' && event.toolCallId) {
             const info = this.toolCallLocations.get(event.toolCallId);
             if (info && info.paths.length > 0 && (info.kind === 'edit' || info.kind === 'read')) {
               for (const filePath of info.paths) {
                 this.openFileInEditor(filePath, info.kind === 'edit');
+                // Show diff for edit operations
+                if (info.kind === 'edit') {
+                  const original = this.editSnapshots.get(filePath);
+                  if (original !== undefined) {
+                    try {
+                      const newContent = fs.readFileSync(filePath, 'utf8');
+                      if (original !== newContent) {
+                        void showDiff({ filePath, originalContent: original, newContent });
+                      }
+                    } catch { /* file read failed */ }
+                    this.editSnapshots.delete(filePath);
+                  }
+                }
               }
             }
             this.toolCallLocations.delete(event.toolCallId);
@@ -118,6 +139,14 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
               kind: event.toolKind,
               paths: event.toolLocations,
             });
+            // Snapshot file contents before agent edits (for diff display)
+            if (event.toolKind === 'edit') {
+              for (const filePath of event.toolLocations) {
+                try {
+                  this.editSnapshots.set(filePath, fs.readFileSync(filePath, 'utf8'));
+                } catch { /* file may not exist yet */ }
+              }
+            }
           }
           this.post({
             type: 'toolCall',
@@ -127,6 +156,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
             toolDetail: event.toolDetail,
             toolKind: event.toolKind,
             toolLocations: event.toolLocations,
+            toolOutput: (event as any).toolOutput,
           });
         }
       }
@@ -260,6 +290,8 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
       this.messageQueue = [];
       this.lastTurnText = '';
       this.lastTurnTools = [];
+      // Optimistic UI update — model selector reflects change immediately
+      this.post({ type: 'statusBar', model: msg.model });
       if (this.busy) {
         await this.session.cancel();
       }
@@ -427,9 +459,8 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
         const next = this.messageQueue.shift()!;
         this.post({ type: 'busy', active: true, queued: this.messageQueue.length });
         void this.runPrompt(next);
-      } else {
-        this.post({ type: 'busy', active: false, queued: 0 });
       }
+      // busy:false now sent by webview 'done' handler — removed from here
     }
   }
 

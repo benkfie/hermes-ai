@@ -10,7 +10,7 @@ import { createInitialState } from './state';
 import {
   renderMarkdown, appendDiv, appendMessage, showWaiting,
   formatToolDisplay, renderTodoOverlay, detectTodoUpdate,
-  loadHistory, fmtTok,
+  loadHistory, fmtTok, renderTerminalBlock,
 } from './renderers';
 import {
   closeAllDropdowns, buildSessionPicker, setupSessionPickerHandlers,
@@ -164,6 +164,7 @@ function send(): void {
     // The response from the adapter will be styled as a system bubble on 'done'.
     if (!isSlash) appendMessage(messagesEl, 'user', text);
     S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.thinkingText = ''; S.pendingText = '';
+    S.terminalBlocks.clear();
     S.pendingSlashResponse = isSlash;
     if (!isSlash) showWaiting(messagesEl);
   } else {
@@ -444,13 +445,16 @@ window.addEventListener('message', (e: MessageEvent) => {
     case 'thinking':
       if (!S.thinkingStatusEl) {
         document.getElementById('waiting')?.remove();
-        S.thinkingStatusEl = appendDiv(messagesEl, 'status-line thinking-status');
+        S.thinkingStatusEl = appendDiv(messagesEl, 'thinking-block');
         S.thinkingStatusEl.id = 'turn-thinking';
       }
-      S.thinkingStatusEl.textContent = msg.text ?? '';
+      S.thinkingText += msg.text ?? '';
+      S.thinkingStatusEl.textContent = S.thinkingText;
+      autoScroll();
       break;
 
     case 'toolCall': {
+      // tool_call_update — update existing tool
       if (!msg.toolName && msg.toolCallId) {
         const existing = document.querySelector(`[data-tool-id="${msg.toolCallId}"]`);
         if (existing) {
@@ -461,9 +465,17 @@ window.addEventListener('message', (e: MessageEvent) => {
             statusEl.textContent = isDone ? '✓' : isError ? '✗' : '⋯';
             statusEl.className = `tool-status${isDone ? ' done' : isError ? ' error' : ''}`;
           }
+          // Update terminal block output if this is an execute tool
+          const termBlock = document.querySelector(`[data-term-id="${msg.toolCallId}"]`);
+          if (termBlock && (msg as any).toolOutput) {
+            const body = termBlock.querySelector('.term-body') as HTMLElement;
+            if (body) body.textContent = (msg as any).toolOutput;
+            if (isDone || isError) termBlock.classList.add('term-done');
+          }
         }
         break;
       }
+      // New tool call
       if (S.pendingText) flushPending();
       if (S.currentAgentEl && S.currentAgentText) renderMarkdown(S.currentAgentEl, S.currentAgentText);
       S.currentAgentEl = null; S.currentAgentText = '';
@@ -472,11 +484,18 @@ window.addEventListener('message', (e: MessageEvent) => {
       const isError = msg.toolStatus === 'error';
       const statusIcon = isDone ? '✓' : isError ? '✗' : '⋯';
       const statusClass = isDone ? ' done' : isError ? ' error' : '';
-      const toolEl = appendDiv(messagesEl, 'msg tool');
-      if (msg.toolCallId) toolEl.dataset.toolId = msg.toolCallId;
-      const { label, info } = formatToolDisplay(msg.toolName ?? '', msg.toolKind, msg.toolLocations, msg.toolDetail);
-      const infoHtml = info ? `<span class="tool-detail">${DOMPurify.sanitize(info)}</span>` : '';
-      toolEl.innerHTML = `<span class="tool-status${statusClass}">${statusIcon}</span><span class="tool-name">${label}</span>${infoHtml}`;
+
+      // Render execute/bash tools as terminal blocks with full command + output
+      if (msg.toolKind === 'execute' && msg.toolName) {
+        const cmd = msg.toolName.replace(/^Bash:\s*/, '').trim() || msg.toolName;
+        renderTerminalBlock(messagesEl, msg.toolCallId ?? '', cmd, (msg as any).toolOutput ?? '', isDone);
+      } else {
+        const toolEl = appendDiv(messagesEl, 'msg tool');
+        if (msg.toolCallId) toolEl.dataset.toolId = msg.toolCallId;
+        const { label, info } = formatToolDisplay(msg.toolName ?? '', msg.toolKind, msg.toolLocations, msg.toolDetail);
+        const infoHtml = info ? `<span class="tool-detail">${DOMPurify.sanitize(info)}</span>` : '';
+        toolEl.innerHTML = `<span class="tool-status${statusClass}">${statusIcon}</span><span class="tool-name">${label}</span>${infoHtml}`;
+      }
       autoScroll();
       break;
     }
@@ -529,6 +548,7 @@ window.addEventListener('message', (e: MessageEvent) => {
       }
       S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null;
       S.pendingSlashResponse = false;
+      setBusy(false);
       inputEl.focus();
       break;
 

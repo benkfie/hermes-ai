@@ -819,4 +819,42 @@ const CSS_TEMPLATE = /* css */ `
     .thinking-collapsed:hover { opacity: 0.7; }
     .thinking-collapsed::after { content: ' (click to expand)'; font-size: 0.8em; opacity: 0.5; }
 
+    /* ── Terminal blocks ────────────────────────────── */
+    .msg.terminal {
+      background: var(--vscode-textCodeBlock-background, rgba(0,0,0,0.3));
+      border: 1px solid var(--vscode-input-border);
+      border-radius: var(--radius-md);
+      margin: 4px 0;
+      overflow: hidden;
+      font-family: var(--vscode-editor-font-family, 'Courier New', monospace);
+      font-size: 0.82em;
+    }
+    .msg.terminal .term-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.2);
+      border-bottom: 1px solid var(--vscode-input-border);
+      font-family: var(--ui-font);
+      font-size: 0.85em;
+      color: var(--vscode-descriptionForeground);
+    }
+    .msg.terminal .term-header .term-icon {
+      color: var(--accent); font-weight: 700; font-size: 1.1em;
+    }
+    .msg.terminal .term-header .term-cmd {
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: var(--vscode-foreground); opacity: 0.8;
+    }
+    .msg.terminal .term-body {
+      margin: 0; padding: 8px 10px;
+      max-height: 400px; overflow-y: auto;
+      color: var(--vscode-input-foreground);
+      background: transparent;
+      white-space: pre-wrap; word-break: break-all;
+      line-height: 1.4;
+    }
+    .msg.terminal.term-done {
+      border-color: rgba(78, 201, 176, 0.3);
+    }
+
 `;

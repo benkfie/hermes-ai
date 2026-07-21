@@ -77,6 +77,51 @@ export function formatToolDisplay(
   return { label, info: detail ?? '' };
 }
 
+
+// ── Terminal block rendering ──────────────────────────
+
+/** Render or update a collapsible terminal block for an execute tool call. */
+export function renderTerminalBlock(
+  container: HTMLElement,
+  toolId: string,
+  command: string,
+  outputBlock: string,
+  isDone: boolean,
+): HTMLElement {
+  let block = container.querySelector(`[data-term-id="${toolId}"]`);
+  if (!block) {
+    block = appendDiv(container, 'msg terminal');
+    (block as HTMLElement).setAttribute('data-term-id', toolId);
+    const header = document.createElement('div');
+    header.className = 'term-header';
+    header.innerHTML = `<span class="term-icon">$</span><span class="term-cmd">${escapeTerm(command)}</span>`;
+    block.appendChild(header);
+    const body = document.createElement('pre');
+    body.className = 'term-body';
+    block.appendChild(body);
+  }
+
+  const body = block.querySelector('.term-body') as HTMLElement;
+  if (body && outputBlock) {
+    body.textContent = outputBlock;
+  }
+
+  if (isDone) {
+    block.classList.add('term-done');
+  } else {
+    block.classList.remove('term-done');
+  }
+
+  (block as HTMLElement).scrollIntoView({ block: 'end' });
+  return block as HTMLElement;
+}
+
+function escapeTerm(s: string): string {
+  const el = document.createElement('span');
+  el.textContent = s;
+  return el.innerHTML;
+}
+
 // ── Todo overlay ─────────────────────────────────────
 
 const TODO_ICONS: Record<string, string> = {
