@@ -6,6 +6,7 @@ import { execFileSync } from 'child_process';
 import { AcpClient } from './acpClient';
 import { PermissionRequestHandler, SessionManager } from './sessionManager';
 import { ChatPanelProvider } from './chatPanel';
+import { SettingsPanelProvider } from './settingsPanel';
 
 const DEFAULT_SONNET_MODEL = 'claude-sonnet-4-6';
 const APPROVED_BINARIES_KEY = 'hermes.approvedBinaries';
@@ -271,8 +272,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     line => outputChannel.appendLine(line),
   );
 
+  // Register chat view
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(ChatPanelProvider.viewId, panel, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
+  );
+
+  // Register settings view
+  const settingsPanel = new SettingsPanelProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(SettingsPanelProvider.viewId, settingsPanel, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
   );
@@ -289,6 +299,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       outputChannel.appendLine('[ui] new session');
       session.reset();
       panel.post({ type: 'clear' });
+    }),
+
+    vscode.commands.registerCommand('hermes.openSettings', async () => {
+      outputChannel.appendLine('[ui] open settings');
+      await vscode.commands.executeCommand('hermes.settingsView.focus');
     }),
   );
 

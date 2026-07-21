@@ -56,6 +56,10 @@
       {
         "command": "hermes.newSession",
         "title": "Hermes: New Session"
+      },
+      {
+        "command": "hermes.openSettings",
+        "title": "Hermes: Open Settings"
       }
     ],
     "viewsContainers": {
@@ -73,6 +77,11 @@
           "type": "webview",
           "id": "hermes.chatView",
           "name": "Chat"
+        },
+        {
+          "type": "webview",
+          "id": "hermes.settingsView",
+          "name": "Settings"
         }
       ]
     },
@@ -89,6 +98,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable diagnostic ACP logs in the Hermes output channel."
+        },
+        "hermes.autoConnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically connect to Hermes when VS Code starts"
         }
       }
     }

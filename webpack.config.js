@@ -19,7 +19,7 @@ module.exports = [
     },
     resolve: { extensions: ['.ts', '.js'] },
   },
-  // Webview bundle (browser) — uses its own tsconfig with DOM lib
+  // Chat webview bundle (browser)
   {
     name: 'webview',
     target: 'web',
@@ -27,6 +27,29 @@ module.exports = [
     output: {
       path: path.resolve(__dirname, 'dist'),
       filename: 'webview.js',
+    },
+    module: {
+      rules: [
+        {
+          test: /\.ts$/,
+          use: {
+            loader: 'ts-loader',
+            options: { configFile: path.resolve(__dirname, 'src/webview/tsconfig.json') },
+          },
+          exclude: /node_modules/,
+        },
+      ],
+    },
+    resolve: { extensions: ['.ts', '.js'] },
+  },
+  // Settings webview bundle (browser)
+  {
+    name: 'settings',
+    target: 'web',
+    entry: './src/webview/settings/main.ts',
+    output: {
+      path: path.resolve(__dirname, 'dist'),
+      filename: 'settings.js',
     },
     module: {
       rules: [
