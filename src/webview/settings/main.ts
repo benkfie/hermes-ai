@@ -155,16 +155,22 @@ function renderModelCatalog(catalog: Array<{ provider: string; modelId: string; 
   
   for (const provider of providers) {
     const models = byProvider[provider].sort((a, b) => a.name.localeCompare(b.name));
+    const safeProvider = escapeHtml(provider);
     
-    html += `<div class="provider-section">`;
-    html += `<h3>${escapeHtml(provider)}</h3>`;
+    html += `<div class="provider-section" data-provider="${safeProvider}">`;
+    html += `<div class="provider-header">`;
+    html += `<h3>${safeProvider}</h3>`;
+    html += `<div class="provider-actions">`;
+    html += `<button class="small secondary select-all" data-provider="${safeProvider}">Select All</button>`;
+    html += `<button class="small secondary deselect-all" data-provider="${safeProvider}">Deselect All</button>`;
+    html += `</div></div>`;
     html += `<div class="model-list">`;
     
     for (const m of models) {
       const checked = m.visible ? 'checked' : '';
       html += `
         <label style="display: block; margin: 4px 0;">
-          <input type="checkbox" data-provider="${escapeHtml(provider)}" data-model-id="${escapeHtml(m.modelId)}" ${checked} style="margin-right: 8px;">
+          <input type="checkbox" data-provider="${safeProvider}" data-model-id="${escapeHtml(m.modelId)}" ${checked} style="margin-right: 8px;">
           ${escapeHtml(m.name)}
         </label>
       `;
@@ -179,10 +185,22 @@ function renderModelCatalog(catalog: Array<{ provider: string; modelId: string; 
   
   container.innerHTML = html;
   
-  // Wire up events for the checkboxes
-  container.querySelectorAll('input[type="checkbox"][data-model-id]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      // We don't need to update any UI here; the save button will read all checkboxes.
+  // Wire up Select All / Deselect All buttons
+  container.querySelectorAll('.select-all').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const provider = (btn as HTMLElement).dataset.provider;
+      container.querySelectorAll(`input[type="checkbox"][data-provider="${provider}"]`).forEach(cb => {
+        (cb as HTMLInputElement).checked = true;
+      });
+    });
+  });
+  
+  container.querySelectorAll('.deselect-all').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const provider = (btn as HTMLElement).dataset.provider;
+      container.querySelectorAll(`input[type="checkbox"][data-provider="${provider}"]`).forEach(cb => {
+        (cb as HTMLInputElement).checked = false;
+      });
     });
   });
 }
