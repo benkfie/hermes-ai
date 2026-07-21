@@ -114,7 +114,7 @@ function readConfiguredProviders(): Set<string> {
       if (key === 'OPENROUTER_API_KEY') providers.add('openrouter');
       else if (key === 'ANTHROPIC_API_KEY') providers.add('anthropic');
       else if (key === 'OPENAI_API_KEY') providers.add('openai');
-      else if (key === 'GEMINI_API_KEY' || key === 'GOOGLE_API_KEY') providers.add('gemini');
+      else if (key === 'GOOGLE_API_KEY' || key === 'GEMINI_API_KEY') providers.add('google');
       else if (key === 'DEEPSEEK_API_KEY') providers.add('deepseek');
       else if (key === 'MISTRAL_API_KEY') providers.add('mistral');
       else if (key === 'GROQ_API_KEY') providers.add('groq');
@@ -122,6 +122,7 @@ function readConfiguredProviders(): Set<string> {
       else if (key === 'TOGETHER_API_KEY') providers.add('together');
       else if (key === 'FIREWORKS_API_KEY') providers.add('fireworks');
       else if (key === 'PERPLEXITY_API_KEY') providers.add('perplexity');
+      else if (key === 'LM_BASE_URL') providers.add('local');
     }
   } catch { /* ignore */ }
 
@@ -133,14 +134,21 @@ function readConfiguredProviders(): Set<string> {
     providers.add(clean);
   }
 
-  // Also add local if there's a base_url pointing to localhost
+  // Also add local if there's a base_url pointing to localhost or LM_BASE_URL set
   try {
     const configPath = path.join(os.homedir(), '.hermes', 'config.yaml');
     const content = fs.readFileSync(configPath, 'utf8');
-    if (content.includes("'base_url': 'http://127.0.0.1") || content.includes("'base_url': 'http://localhost")) {
+    if (content.includes("'base_url': 'http://127.0.0.1") ||
+        content.includes("'base_url': 'http://localhost") ||
+        content.includes('localhost')) {
       providers.add('local');
     }
   } catch { /* ignore */ }
+
+  // Also check LM_BASE_URL env var
+  if (process.env.LM_BASE_URL) {
+    providers.add('local');
+  }
 
   return providers;
 }
@@ -159,6 +167,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   together: 'Together AI',
   fireworks: 'Fireworks',
   perplexity: 'Perplexity',
+  google: 'Gemini',
   local: 'Local',
 };
 
@@ -201,9 +210,11 @@ export function loadHermesModelGroups(): ModelMenuGroup[] {
     const providerCache = cache?.[providerId];
     const models = providerCache?.models;
 
+    let items: ModelMenuItem[] = [];
+
     if (models && Object.keys(models).length > 0) {
-      // Sort: prefer known model families first
-      const items = Object.entries(models)
+      // Sort alphabetically by name
+      items = Object.entries(models)
         .sort(([, a], [, b]) => {
           const aName = (a.name || '').toLowerCase();
           const bName = (b.name || '').toLowerCase();
@@ -214,13 +225,26 @@ export function loadHermesModelGroups(): ModelMenuGroup[] {
           label: formatLabel(id, record),
           command: id,
         }));
+    }
 
-      if (items.length > 0) {
-        groups.push({
-          group: providerLabel(providerId),
-          items: items.length > 20 ? items.slice(0, 20) : items,
-        });
+    // For providers without a cache (e.g. local/custom), show the current model
+    if (items.length === 0 && currentModel) {
+      // Check if this model belongs to this provider
+      // For local providers, always show the current model
+      if (providerId === 'local' || (providerId === 'google' && currentModel.includes('gemini'))) {
+        items = [{
+          id: currentModel,
+          label: formatLabel(currentModel),
+          command: currentModel,
+        }];
       }
+    }
+
+    if (items.length > 0) {
+      groups.push({
+        group: providerLabel(providerId),
+        items: items.slice(0, 30),  // Show up to 30 models per provider
+      });
     }
   }
 
