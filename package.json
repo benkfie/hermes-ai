@@ -27,7 +27,7 @@
     "type": "git",
     "url": "https://github.com/benkfie/hermes-ai.git"
   },
-  "icon": "resources/hermes-logo-128.png",
+  "icon": "resources/hermes-iconv2.png",
   "galleryBanner": {
     "color": "#1f1f1f",
     "theme": "dark"
@@ -91,7 +91,7 @@
         {
           "id": "hermes-ai",
           "title": "Hermes AI",
-          "icon": "resources/hermes-icon.svg"
+          "icon": "resources/hermes-iconv2.png"
         }
       ]
     },
