@@ -88,28 +88,19 @@ ${CSS_TEMPLATE}
 </head>
 <body>
   <div id="header">
-    <div id="header-brand">
-      <span class="brand-icon">☤</span>
-      <span class="brand-text">Hermes</span>
-      <span class="brand-version" id="status-version"></span>
-      <span class="brand-sep">·</span>
-      <button id="model-btn-header" title="Switch model">${escapeHtml(modelLabel)} ▾</button>
-    </div>
     <div id="header-session">
-      <button id="status-session" title="Sessions">new session</button>
+      <span class="sessions-label">Sessions</span>
+      <button id="status-session" title="Switch session">new session</button>
       <div id="status-right">
         <div id="ctx-bar-wrap" style="display:none"><div id="ctx-bar"></div><div id="ctx-bar-fresh"></div></div>
         <span id="status-context"></span>
       </div>
     </div>
     <div id="session-picker" class="status-dropdown" style="display:none"></div>
-    <div id="model-menu" style="display:none">
-      ${modelMenuHtml}
-    </div>
   </div>
   <div id="messages">
     <div id="empty-state">
-      <div class="empty-logo">☤</div>
+      <div class="empty-logo">✦</div>
       <div class="empty-title">What can I help you with?</div>
       <div class="prompt-chips">
         <div class="prompt-chip" data-prompt="Review this file">Review this file</div>
@@ -130,7 +121,15 @@ ${CSS_TEMPLATE}
   </div>
   <div id="queue-status"></div>
   <div id="bottom-bar">
-    <button class="cmd-btn" id="attach-btn" title="Attach file"><span class="btn-icon">⊕</span></button>
+    <div class="btn-wrap" style="position:relative">
+      <button class="cmd-btn" id="model-btn-header" title="Switch model" style="width:auto;padding:0 8px;font-size:0.75em;gap:4px;">
+        <span style="opacity:0.5;font-size:0.9em;">🧠</span>${escapeHtml(modelLabel)} ▾
+      </button>
+      <div id="model-menu" style="display:none">
+        ${modelMenuHtml}
+      </div>
+    </div>
+    <button class="cmd-btn" id="attach-btn" title="Attach file"><span class="btn-icon">📎</span></button>
     <div class="btn-wrap">
       <button class="cmd-btn" id="skills-btn" title="Skills"><span class="btn-icon">✦</span></button>
       <div id="skills-menu" style="display:none"></div>
@@ -165,8 +164,6 @@ ${CSS_TEMPLATE}
       </div>
     </div>
     <div class="bar-spacer"></div>
-    <div id="logo-mark"><img src="${logoUri}" alt="Hermes"/></div>
-    <div class="bar-spacer"></div>
     <div id="input-btns">
       <div id="action-area">
         <button id="send-btn">Send</button>
@@ -193,16 +190,19 @@ const CSS_TEMPLATE = /* css */ `
 
     :root {
       --ui-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      --gold: #F5C542;
-      --gold-dim: rgba(245, 197, 66, 0.65);
-      --gold-subtle: rgba(245, 197, 66, 0.12);
-      --gold-border: rgba(245, 197, 66, 0.25);
+      --accent: var(--vscode-focusBorder, #007acc);
+      --accent-dim: var(--vscode-textLink-foreground, #3794ff);
+      --accent-subtle: rgba(0, 122, 204, 0.12);
+      --accent-border: rgba(0, 122, 204, 0.3);
       --toolbar-height: 28px;
       --space-xs: 2px;
       --space-sm: 4px;
       --space-md: 8px;
       --space-lg: 12px;
       --space-xl: 16px;
+      --radius-sm: 3px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
     }
 
     body {
@@ -216,123 +216,112 @@ const CSS_TEMPLATE = /* css */ `
       overflow: hidden;
     }
 
-    /* ── Header (two rows) ────────────────────────────── */
+    /* ── Top bar (compact session selector) ──────────── */
     #header {
       border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border);
-      background: var(--vscode-sideBarSectionHeader-background, rgba(128,128,128,0.08));
+      background: var(--vscode-sideBarSectionHeader-background, rgba(128,128,128,0.06));
       font-family: var(--ui-font);
       flex-shrink: 0;
       position: relative;
       z-index: 10;
+      padding: 3px 8px;
+      display: flex; align-items: center; gap: 8px;
     }
-
-    /* Row 1: brand + model */
-    #header-brand {
-      display: flex; align-items: center; gap: 6px;
-      padding: 5px 8px 2px;
-      font-size: 0.85em;
-    }
-    #header-brand .brand-icon { font-size: 1.4em; color: var(--gold); }
-    #header-brand .brand-text { font-weight: 700; color: var(--gold); letter-spacing: 0.04em; }
-    #header-brand .brand-sep { opacity: 0.3; }
-    #header-brand .brand-version { opacity: 0.4; font-size: 0.85em; }
-    #model-btn-header {
-      background: none; border: none; cursor: pointer;
-      color: var(--vscode-descriptionForeground);
-      font: inherit; font-size: 1em; padding: 0;
-    }
-    #model-btn-header:hover { color: var(--gold); }
-
-    /* Row 2: session + tokens */
     #header-session {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 2px 8px 5px; gap: 8px;
+      display: flex; align-items: center; gap: 6px;
+      flex: 1; min-width: 0;
+    }
+    #header-session .sessions-label {
+      font-size: 0.7em; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--vscode-descriptionForeground);
+      opacity: 0.6; flex-shrink: 0;
     }
     #status-session {
       flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       cursor: pointer; background: none; border: none;
       color: var(--vscode-foreground); font: inherit;
       font-family: var(--ui-font); font-size: 0.82em;
-      padding: 0; text-align: left; min-width: 0;
+      padding: 2px 6px; text-align: left; min-width: 0;
+      border-radius: var(--radius-sm);
+      transition: background 0.15s;
     }
-    #status-session:hover { color: var(--gold); }
+    #status-session:hover { background: var(--accent-subtle); }
+    #status-session::before { content: '💬 '; font-size: 0.9em; }
     *:focus-visible {
-      outline: 1px solid var(--vscode-focusBorder, var(--gold));
+      outline: 1px solid var(--vscode-focusBorder, var(--accent));
       outline-offset: 1px;
     }
-
     #status-right {
-      display: flex; align-items: center; gap: 5px;
-      flex-shrink: 0; font-size: 0.82em;
+      display: flex; align-items: center; gap: 6px;
+      flex-shrink: 0; font-size: 0.78em;
       font-family: var(--ui-font);
       color: var(--vscode-descriptionForeground);
     }
     #status-context {
       white-space: nowrap; font-variant-numeric: tabular-nums;
     }
-    #status-context.warn { color: var(--gold); opacity: 1; }
-    #status-context.crit { color: #C94040; opacity: 1; }
+    #status-context.warn { color: #e5a000; opacity: 1; }
+    #status-context.crit { color: var(--vscode-errorForeground, #f44747); }
 
-    /* Token progress bar — dual layer: total (faded) + fresh (solid) */
+    /* Token bar */
     #ctx-bar-wrap {
-      width: 52px; height: 5px;
+      width: 48px; height: 5px;
       background: rgba(255,255,255,0.1);
       border-radius: 2px; overflow: hidden; flex-shrink: 0;
       position: relative;
     }
-    /* Total usage (cached + fresh) — faded background fill */
     #ctx-bar {
       position: absolute; top: 0; left: 0;
       height: 100%; width: 0%;
       border-radius: 2px;
-      background: var(--gold);
+      background: var(--accent);
       opacity: 0.3;
-      transition: width 0.4s ease, background 0.3s;
+      transition: width 0.4s ease;
     }
-    /* Fresh (non-cached) usage — solid foreground fill */
     #ctx-bar-fresh {
       position: absolute; top: 0; left: 0;
       height: 100%; width: 0%;
       border-radius: 2px;
-      background: var(--gold);
-      transition: width 0.4s ease, background 0.3s;
+      background: var(--accent);
+      transition: width 0.4s ease;
     }
-    #ctx-bar.warn, #ctx-bar-fresh.warn { background: var(--gold); }
-    #ctx-bar.crit, #ctx-bar-fresh.crit { background: #C94040; }
+    #ctx-bar.warn, #ctx-bar-fresh.warn { background: #e5a000; }
+    #ctx-bar.crit, #ctx-bar-fresh.crit { background: var(--vscode-errorForeground, #f44747); }
 
     /* ── Dropdowns ──────────────────────────────────── */
     .status-dropdown {
       position: absolute; top: calc(100% + 1px); left: 0; right: 0;
       background: var(--vscode-dropdown-background, var(--vscode-sideBar-background));
       border: 1px solid var(--vscode-dropdown-border, var(--vscode-sideBarSectionHeader-border));
-      border-radius: 0 0 4px 4px; z-index: 200; overflow: hidden;
+      border-radius: 0 0 var(--radius-md) var(--radius-md); z-index: 200; overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     }
     .status-dropdown .menu-item {
-      padding: 5px 10px; font-size: 0.82em; font-family: var(--ui-font);
+      padding: 6px 10px; font-size: 0.82em; font-family: var(--ui-font);
       color: var(--vscode-foreground); cursor: pointer;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       display: flex; align-items: center; gap: 6px;
     }
-    .status-dropdown .menu-item:hover { background: var(--gold-subtle); }
-    .status-dropdown .menu-item.active { color: var(--gold); font-weight: 600; }
+    .status-dropdown .menu-item:hover { background: var(--accent-subtle); }
+    .status-dropdown .menu-item.active { color: var(--accent); font-weight: 600; }
     .status-dropdown .menu-item .item-meta {
       opacity: 0.4; font-size: 0.85em; margin-left: auto; flex-shrink: 0;
     }
     .status-dropdown .menu-footer {
-      padding: 5px 10px; font-size: 0.82em; font-family: var(--ui-font);
+      padding: 6px 10px; font-size: 0.82em; font-family: var(--ui-font);
       color: var(--vscode-descriptionForeground); cursor: pointer;
       border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
     }
-    .status-dropdown .menu-footer:hover { background: var(--gold-subtle); color: var(--gold); }
+    .status-dropdown .menu-footer:hover { background: var(--accent-subtle); color: var(--accent); }
     .session-action {
       opacity: 0; cursor: pointer; font-size: 0.9em; flex-shrink: 0;
-      padding: 0 2px; transition: opacity 0.15s;
+      padding: 0 3px; transition: opacity 0.15s;
     }
     .menu-item:hover .session-action { opacity: 0.5; }
     .session-action:hover { opacity: 1 !important; }
-    .delete-session:hover { color: var(--vscode-errorForeground, #C94040); }
+    .delete-session:hover { color: var(--vscode-errorForeground); }
 
-    /* ── Messages ───────────────────────────────────── */
+    /* ── Messages area ──────────────────────────────── */
     #messages {
       flex: 1;
       min-height: 80px;
@@ -340,12 +329,11 @@ const CSS_TEMPLATE = /* css */ `
       padding: var(--space-lg) var(--space-md);
       display: flex;
       flex-direction: column;
-      gap: var(--space-lg);
+      gap: var(--space-md);
     }
-
     .msg {
       padding: 5px 8px;
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
       line-height: 1.35;
       word-break: break-word;
     }
@@ -353,27 +341,11 @@ const CSS_TEMPLATE = /* css */ `
       align-self: flex-end;
       max-width: 88%;
       white-space: pre-wrap;
-      background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.15));
-      border-left: 3px solid var(--gold);
+      background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.12));
+      border-left: 3px solid var(--accent);
       color: var(--vscode-foreground);
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
       padding: 6px 10px;
-    }
-    .msg.user .context-annotation {
-      font-family: var(--ui-font);
-      font-size: 0.72em;
-      opacity: 0.65;
-      margin-top: 4px;
-      padding-top: 4px;
-      border-top: 1px solid rgba(255,255,255,0.15);
-    }
-    .msg.user .context-annotation .ctx-line {
-      display: block;
-      padding: 1px 0;
-    }
-    .msg.user .context-annotation .ctx-icon {
-      opacity: 0.7;
-      margin-right: 3px;
     }
     .msg.user::before {
       content: 'You';
@@ -383,31 +355,35 @@ const CSS_TEMPLATE = /* css */ `
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      opacity: 0.65;
+      opacity: 0.55;
       margin-bottom: 3px;
+    }
+    .msg.user .context-annotation {
+      font-family: var(--ui-font);
+      font-size: 0.72em;
+      opacity: 0.55;
+      margin-top: 4px;
+      padding-top: 4px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .msg.user .context-annotation .ctx-line {
+      display: block;
+      padding: 1px 0;
     }
     .msg.agent {
       background: transparent;
       white-space: pre-wrap;
       padding-left: 2px;
-      /* Smooth height transitions as new paragraphs stream in */
-      transition: height 0.15s ease-out;
     }
-    .msg.agent p, .msg.agent li, .msg.agent pre, .msg.agent blockquote {
-      animation: content-fade 0.2s ease-out;
-    }
-    @keyframes content-fade {
-      from { opacity: 0.6; }
-      to   { opacity: 1; }
-    }
-    /* System messages — slash command responses. Centered, muted, distinct
-       from both user and agent bubbles. They're controls, not conversation. */
+    .msg.agent p { margin: 0.5em 0; white-space: normal; }
+    .msg.agent p:first-child { margin-top: 0; }
+    .msg.agent p:last-child { margin-bottom: 0; }
     .msg.system {
       align-self: center;
       max-width: 92%;
-      background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08));
-      border: 1px solid var(--vscode-input-border, rgba(128,128,128,0.25));
-      border-radius: 6px;
+      background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.06));
+      border: 1px solid var(--vscode-input-border);
+      border-radius: var(--radius-md);
       padding: 8px 12px;
       font-family: var(--ui-font);
       font-size: 0.85em;
@@ -416,15 +392,12 @@ const CSS_TEMPLATE = /* css */ `
       margin: var(--space-sm) auto;
       text-align: left;
     }
-    .msg.system code, .msg.system pre {
-      font-size: 0.9em;
-    }
     .msg.tool {
       font-family: var(--vscode-editor-font-family, monospace);
       font-size: 0.8em;
       color: var(--vscode-foreground);
-      background: var(--vscode-textCodeBlock-background, rgba(128,128,128,0.1));
-      border-radius: 4px;
+      background: var(--vscode-textCodeBlock-background, rgba(128,128,128,0.08));
+      border-radius: var(--radius-sm);
       padding: 5px 10px;
       display: flex;
       align-items: baseline;
@@ -432,34 +405,36 @@ const CSS_TEMPLATE = /* css */ `
       min-height: 22px;
       clear: both;
     }
-    .msg.tool + .msg.tool { margin-top: calc(-1 * var(--space-md)); }
+    .msg.tool + .msg.tool { margin-top: -8px; }
     .msg.agent + .msg.tool { margin-top: var(--space-xs); }
     .msg.tool + .msg.agent { margin-top: var(--space-md); }
-    .thinking-status + .msg.tool { margin-top: var(--space-xs); }
-
     .msg.tool .tool-status {
-      color: var(--gold); flex-shrink: 0; width: 1.2em; text-align: center;
+      color: var(--accent); flex-shrink: 0; width: 1.2em; text-align: center;
       font-size: 1.1em; font-weight: 700;
     }
-    .msg.tool .tool-status.done { color: #4EC9B0; }
-    .msg.tool .tool-status.error { color: #C94040; }
-    .msg.tool .tool-name {
-      font-weight: 700; white-space: nowrap;
+    .msg.tool .tool-status.done { color: #4ec9b0; }
+    .msg.tool .tool-status.error { color: var(--vscode-errorForeground, #f44747); }
+    .msg.tool .tool-name { font-weight: 700; white-space: nowrap; }
+    .msg.tool .tool-detail { opacity: 0.6; word-break: break-all; overflow-wrap: anywhere; min-width: 0; }
+    .msg.error {
+      font-family: var(--ui-font);
+      color: var(--vscode-errorForeground);
+      font-size: 0.85em;
     }
-    .msg.tool .tool-detail {
-      opacity: 0.6; word-break: break-all; overflow-wrap: anywhere;
-      min-width: 0;
-    }
-    /* Prevent horizontal overflow */
-    #messages { overflow-x: hidden; }
+    .thinking-status { font-style: italic; color: var(--accent-dim); opacity: 0.7; }
+    .thinking-status + .msg.tool { margin-top: var(--space-xs); }
 
-    /* ── Empty state ──────────────────────────────── */
+    /* ── Empty state ────────────────────────────────── */
     #empty-state {
       display: flex; flex-direction: column; align-items: center;
       justify-content: center; gap: 12px; padding: 24px 16px;
       flex: 1; text-align: center;
     }
-    #empty-state .empty-logo { font-size: 2.5em; color: var(--gold); opacity: 0.5; }
+    #empty-state .empty-logo {
+      font-size: 3em; opacity: 0.2;
+      /* Caduceus replaced with a clean sparkle */
+      content: '✦';
+    }
     #empty-state .empty-title {
       font-family: var(--ui-font); font-size: 0.95em;
       color: var(--vscode-descriptionForeground);
@@ -468,59 +443,14 @@ const CSS_TEMPLATE = /* css */ `
       display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 260px;
     }
     .prompt-chip {
-      background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.1));
-      border: 1px solid var(--vscode-input-border, rgba(128,128,128,0.2));
-      border-radius: 6px; padding: 8px 12px;
+      background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08));
+      border: 1px solid var(--vscode-input-border);
+      border-radius: var(--radius-md); padding: 8px 12px;
       font-family: var(--ui-font); font-size: 0.85em;
       color: var(--vscode-foreground); cursor: pointer;
       text-align: left; transition: border-color 0.15s;
     }
-    .prompt-chip:hover { border-color: var(--gold); color: var(--gold); }
-    .msg.agent pre { white-space: pre-wrap; word-break: break-word; overflow-x: auto; }
-    .msg.error {
-      font-family: var(--ui-font);
-      color: var(--vscode-errorForeground);
-      font-size: 0.85em;
-    }
-
-    /* ── Todo overlay ──────────────────────────────── */
-    /* Rendered as a card anchored directly above the composer. Matches the
-       composer's horizontal margins so the two read as one stacked unit. */
-    #todo-overlay {
-      font-family: var(--ui-font); font-size: 0.82em;
-      margin: 0 8px 4px; padding: 6px 10px;
-      background: var(--vscode-sideBarSectionHeader-background, rgba(128,128,128,0.05));
-      border: 1px solid var(--vscode-input-border, rgba(128,128,128,0.3));
-      border-radius: 8px;
-      flex-shrink: 0; display: none;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    }
-    #todo-overlay .todo-header {
-      font-weight: 700; font-size: 0.78em;
-      text-transform: uppercase; letter-spacing: 0.06em;
-      color: var(--vscode-descriptionForeground);
-      margin-bottom: 4px;
-    }
-    #todo-overlay .todo-item {
-      display: flex; align-items: flex-start; gap: 6px;
-      padding: 2px 0;
-    }
-    #todo-overlay .todo-icon {
-      flex-shrink: 0; width: 1.2em; text-align: center;
-    }
-    #todo-overlay .todo-icon.completed { color: #4EC9B0; }
-    #todo-overlay .todo-icon.in_progress { color: var(--gold); }
-    #todo-overlay .todo-icon.pending { opacity: 0.4; }
-    #todo-overlay .todo-text { flex: 1; }
-    #todo-overlay .todo-text.completed {
-      text-decoration: line-through; opacity: 0.5;
-    }
-    #todo-overlay .todo-text.in_progress { color: var(--gold); font-weight: 500; }
-    #todo-overlay .todo-summary {
-      font-size: 0.8em; opacity: 0.5; margin-top: 3px;
-    }
-
-    /* History divider */
+    .prompt-chip:hover { border-color: var(--accent); color: var(--accent); }
     .history-divider {
       text-align: center;
       font-family: var(--ui-font);
@@ -530,19 +460,14 @@ const CSS_TEMPLATE = /* css */ `
       border-top: 1px solid rgba(128,128,128,0.2);
       margin-top: 4px;
     }
-
     .status-line {
       font-family: var(--ui-font);
       font-size: 0.78em;
       color: var(--vscode-descriptionForeground);
       padding: 1px 4px;
     }
-    .thinking-status { font-style: italic; color: var(--gold); opacity: 0.75; }
 
-    /* ── Markdown typography ────────────────────────── */
-    .msg.agent p          { margin: 0.5em 0; white-space: normal; }
-    .msg.agent p:first-child { margin-top: 0; }
-    .msg.agent p:last-child { margin-bottom: 0; }
+    /* ── Markdown ───────────────────────────────────── */
     .msg.agent h1, .msg.agent h2, .msg.agent h3,
     .msg.agent h4, .msg.agent h5, .msg.agent h6 {
       margin: 0.6em 0 0.2em; line-height: 1.2; font-weight: 600;
@@ -564,11 +489,10 @@ const CSS_TEMPLATE = /* css */ `
     }
     .msg.agent pre {
       background: var(--vscode-textCodeBlock-background, rgba(128,128,128,0.15));
-      border-radius: 4px; padding: 0.6em 0.8em; margin: 0.4em 0;
+      border-radius: var(--radius-sm); padding: 0.6em 0.8em; margin: 0.4em 0;
       overflow-x: auto; white-space: pre;
     }
     .msg.agent pre code { background: none; padding: 0; font-size: 0.85em; border-radius: 0; }
-    .msg.agent pre { position: relative; }
     .msg.agent pre .copy-btn {
       position: absolute; top: 4px; right: 4px;
       background: rgba(128,128,128,0.25); border: none; border-radius: 3px;
@@ -577,13 +501,10 @@ const CSS_TEMPLATE = /* css */ `
       opacity: 0; transition: opacity 0.15s;
     }
     .msg.agent pre:hover .copy-btn { opacity: 0.7; }
-    .msg.agent pre .copy-btn:hover { opacity: 1; background: rgba(245,197,66,0.3); }
-    .msg.agent pre .copy-btn.copied { color: #4EC9B0; }
-    .msg.agent img {
-      max-width: 100%; border-radius: 6px; margin: 0.4em 0;
-      cursor: pointer; transition: opacity 0.2s;
-    }
-    .msg.agent img:hover { opacity: 0.85; }
+    .msg.agent pre .copy-btn:hover { opacity: 1; background: var(--accent-subtle); }
+    .msg.agent pre .copy-btn.copied { color: #4ec9b0; }
+    .msg.agent pre { position: relative; }
+    .msg.agent img { max-width: 100%; border-radius: var(--radius-md); margin: 0.4em 0; }
     .msg.agent a { color: var(--vscode-textLink-foreground); text-decoration: none; }
     .msg.agent a:hover { text-decoration: underline; }
     .msg.agent hr {
@@ -608,59 +529,41 @@ const CSS_TEMPLATE = /* css */ `
       content: ''; width: 28px; height: 2px; border-radius: 2px;
       background: var(--vscode-sideBarSectionHeader-border); opacity: 0.6;
     }
-    #input-drag:hover { background: rgba(128,128,128,0.08); }
-    #input-drag:hover::after { opacity: 1; }
 
-    /* ── Context row (attach btn + file/skill chips) ── */
+    /* ── Context row ────────────────────────────────── */
     #context-row {
       display: flex; align-items: center; gap: 4px;
       padding: 2px 8px 0; flex-shrink: 0;
-      min-height: 0;
     }
-    #context-row:empty, #context-row:not(:has(.chip-name)) { }
     #attach-chip {
       font-family: var(--ui-font); font-size: 0.72em;
-      color: var(--gold);
+      color: var(--accent);
       display: flex; align-items: center; gap: 4px;
       flex-wrap: wrap; flex: 1; min-width: 0;
     }
     #attach-chip .chip-name {
-      background: rgba(245,197,66,0.12); border-radius: 3px;
+      background: var(--accent-subtle); border-radius: 3px;
       padding: 1px 6px; max-width: 160px;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    #attach-chip .chip-x {
-      cursor: pointer; opacity: 0.6; font-size: 1.1em;
-    }
+    #attach-chip .chip-x { cursor: pointer; opacity: 0.6; font-size: 1.1em; }
     #attach-chip .chip-x:hover { opacity: 1; }
 
-    /* ── Composer (textarea + toolbar wrapped in one glowing pill) ── */
+    /* ── Composer ───────────────────────────────────── */
     #composer {
       margin: 4px 8px 8px;
       background: var(--vscode-input-background);
-      border: 1px solid var(--vscode-input-border, rgba(128,128,128,0.3));
-      border-radius: 8px;
+      border: 1px solid var(--vscode-input-border);
+      border-radius: var(--radius-lg);
       overflow: visible;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      transition: border-color 0.2s;
     }
-    #composer:focus-within { border-color: var(--gold); }
-
-    /* Idle glow — subtle ambient gold tint when focused or hovered */
-    @keyframes composer-glow-gold {
-      0%, 100% { border-color: rgba(245, 197, 66, 0.45); box-shadow: 0 0 4px rgba(245,197,66,0.15); }
-      50%       { border-color: rgba(245, 197, 66, 0.85); box-shadow: 0 0 14px rgba(245,197,66,0.35); }
-    }
-    @keyframes composer-glow-red {
-      0%, 100% { border-color: rgba(244, 135, 113, 0.45); box-shadow: 0 0 4px rgba(244,135,113,0.15); }
-      50%       { border-color: rgba(244, 135, 113, 0.90); box-shadow: 0 0 14px rgba(244,135,113,0.40); }
-    }
-    /* Busy glow — applied while the agent is working */
-    #composer.busy-glow { animation: composer-glow-gold 1.6s ease-in-out infinite; }
-    /* YOLO mode — persistent red glow (future /yolo slash command) */
+    #composer:focus-within { border-color: var(--accent); }
+    #composer.busy-glow { border-color: var(--accent); box-shadow: 0 0 8px rgba(0,122,204,0.25); }
     #composer.yolo { border-color: rgba(244, 135, 113, 0.7); }
-    #composer.yolo.busy-glow { animation: composer-glow-red 1.6s ease-in-out infinite; }
+    #composer.yolo.busy-glow { border-color: rgba(244, 135, 113, 0.7); box-shadow: 0 0 8px rgba(244,135,113,0.25); }
 
-    #input-row { display: flex; align-items: stretch; padding: 6px 8px 2px; }
+    #input-row { display: flex; align-items: stretch; padding: 8px 8px 2px; }
     #input {
       flex: 1;
       background: transparent;
@@ -670,105 +573,109 @@ const CSS_TEMPLATE = /* css */ `
       resize: none; min-height: 0; height: 100%; overflow-y: auto;
     }
     #input:focus { outline: none; }
+    #input::placeholder { color: var(--vscode-input-placeholderForeground); }
 
-    /* Send / Stop / Queue group (lives in #bottom-bar now) */
+    /* Send / Stop */
     #input-btns { display: flex; align-items: center; flex-shrink: 0; }
     #action-area { display: flex; align-items: center; }
     #input-btns button {
       font-family: var(--ui-font); font-size: 0.78em; font-weight: 600;
-      letter-spacing: 0.02em; border: none; border-radius: 4px;
-      cursor: pointer; padding: 4px 12px; height: var(--toolbar-height);
+      letter-spacing: 0.02em; border: none; border-radius: var(--radius-sm);
+      cursor: pointer; padding: 4px 14px; height: var(--toolbar-height);
     }
-    #send-btn { background: var(--gold); color: #1e1e1e; min-width: 56px; }
-    #send-btn:hover { background: #E8C940; }
+    #send-btn { background: var(--accent); color: #fff; min-width: 56px; }
+    #send-btn:hover { opacity: 0.85; }
     #busy-btns { display: none; gap: 2px; }
     #busy-btns button { min-width: 32px; font-size: 1em; padding: 4px 8px; }
-    #stop-btn { background: var(--vscode-errorForeground, #C94040); color: #FFF; }
+    #stop-btn { background: var(--vscode-errorForeground, #f44747); color: #fff; }
     #stop-btn:hover { opacity: 0.85; }
-    #queue-btn { background: var(--gold); color: #1e1e1e; }
-    #queue-btn:hover { opacity: 0.85; }
-
-    /* Logo (centered in bottom bar) */
-    #logo-mark {
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; opacity: 0.80;
-    }
-    #logo-mark img { width: 28px; height: 28px; object-fit: contain; transition: filter 0.4s ease; }
-
-    /* Flex spacers used to center the logo between left buttons and Send */
-    .bar-spacer { flex: 1; min-width: 0; }
-    @keyframes hermes-glow {
-      0%, 100% { filter: drop-shadow(0 0 3px rgba(245, 197, 66, 0.25)); }
-      50%       { filter: drop-shadow(0 0 10px rgba(245, 197, 66, 0.85)); }
-    }
-    #logo-mark.busy img { animation: hermes-glow 1.6s ease-in-out infinite; }
+    #queue-btn { background: var(--accent); color: #fff; }
+    #queue-btn:hover { opacity: 0.8; }
 
     #queue-status {
       font-family: var(--ui-font); font-size: 0.72em;
-      color: var(--gold); opacity: 0.8; padding: 0 8px 2px; display: none;
+      color: var(--accent); opacity: 0.8; padding: 0 8px 2px; display: none;
     }
 
-    /* ── Bottom toolbar (inside composer, no top border) ── */
+    /* ── Bottom toolbar ─────────────────────────────── */
     #bottom-bar {
-      display: flex; align-items: center; gap: 4px;
-      padding: 4px 6px 5px;
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 8px 6px;
       flex-shrink: 0; font-family: var(--ui-font);
     }
-    /* Per-button wrapper so dropdowns anchor to their trigger button, not the
-       whole bottom bar. Each .btn-wrap is position: relative, so its children
-       with position: absolute compute offsets relative to the button. */
     #bottom-bar .btn-wrap { position: relative; display: flex; }
+
+    /* Model button in bottom bar */
+    #model-btn-header {
+      background: transparent;
+      border: 1px solid var(--vscode-input-border);
+      border-radius: var(--radius-sm);
+      color: var(--vscode-descriptionForeground);
+      font-family: var(--ui-font); font-size: 0.78em;
+      padding: 2px 8px;
+      cursor: pointer; white-space: nowrap;
+      height: var(--toolbar-height);
+      display: inline-flex; align-items: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    #model-btn-header:hover { color: var(--accent); border-color: var(--accent-border); }
+
     #model-menu {
-      position: absolute; top: 100%; left: 0; right: 0;
+      position: absolute; bottom: calc(100% + 4px); left: 0;
       background: var(--vscode-dropdown-background, var(--vscode-sideBar-background));
       border: 1px solid var(--vscode-dropdown-border, var(--vscode-sideBarSectionHeader-border));
-      border-top: none; border-radius: 0 0 4px 4px;
-      min-width: 180px; z-index: 200; overflow: hidden;
+      border-radius: var(--radius-md);
+      min-width: 220px; z-index: 200; overflow: hidden;
       max-height: 350px; overflow-y: auto;
+      box-shadow: 0 -2px 16px rgba(0,0,0,0.4);
     }
     .model-option {
-      padding: 5px 10px; font-size: 0.85em; font-family: var(--ui-font);
+      padding: 6px 12px; font-size: 0.82em; font-family: var(--ui-font);
       color: var(--vscode-foreground); cursor: pointer; white-space: nowrap;
     }
-    .model-option:hover { background: var(--gold-subtle); color: var(--gold); }
-    .model-option.active { color: var(--gold); font-weight: 600; }
+    .model-option:hover { background: var(--accent-subtle); }
+    .model-option.active { color: var(--accent); font-weight: 600; }
     .model-option.active::before { content: '✓ '; }
     .model-group-label {
-      padding: 4px 10px 2px; font-size: 0.7em; font-family: var(--ui-font);
+      padding: 5px 12px 2px; font-size: 0.68em; font-family: var(--ui-font);
       color: var(--vscode-descriptionForeground); opacity: 0.7;
       text-transform: uppercase; letter-spacing: 0.06em;
     }
     .model-sep { border-top: 1px solid var(--vscode-sideBarSectionHeader-border); margin: 2px 0; }
 
+    /* Toolbar buttons */
     .cmd-btn {
       background: transparent;
-      border: 1px solid var(--vscode-input-border, rgba(128,128,128,0.3));
-      border-radius: 4px;
+      border: 1px solid var(--vscode-input-border);
+      border-radius: var(--radius-sm);
       color: var(--vscode-descriptionForeground);
       font-family: var(--ui-font); font-size: 0.9em; font-weight: 500; padding: 0;
       cursor: pointer; white-space: nowrap; flex-shrink: 0;
-      display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+      display: inline-flex; align-items: center; justify-content: center;
       width: var(--toolbar-height); height: var(--toolbar-height);
+      transition: border-color 0.15s, color 0.15s;
     }
-    .cmd-btn:hover { color: var(--gold); border-color: var(--gold-border); }
-    .cmd-btn:active { background: var(--gold-subtle); }
-    .cmd-btn .btn-icon { font-size: 1.3em; }
-    #skills-btn.has-skills { color: var(--gold); border-color: var(--gold-border); }
+    .cmd-btn:hover { color: var(--accent); border-color: var(--accent-border); }
+    .cmd-btn .btn-icon { font-size: 1.1em; }
+    #skills-btn.has-skills { color: var(--accent); border-color: var(--accent-border); }
 
-    /* Overflow menu — anchored to its .btn-wrap parent (next to the / button) */
+    .bar-spacer { flex: 1; min-width: 0; }
+
+    /* Overflow/slash menu */
     #overflow-menu {
       position: absolute; bottom: calc(100% + 4px); left: 0;
       background: var(--vscode-dropdown-background, var(--vscode-sideBar-background));
       border: 1px solid var(--vscode-dropdown-border, var(--vscode-sideBarSectionHeader-border));
-      border-radius: 4px; min-width: 260px; z-index: 100; overflow: hidden;
+      border-radius: var(--radius-md); min-width: 260px; z-index: 100; overflow: hidden;
       padding: 4px 0;
+      box-shadow: 0 -2px 16px rgba(0,0,0,0.4);
     }
     #overflow-menu .menu-group-label {
       padding: 6px 10px 2px; font-size: 0.66em; font-family: var(--ui-font);
-      color: var(--gold); opacity: 0.8;
+      color: var(--accent); opacity: 0.8;
       text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
     }
-    #overflow-menu .menu-group-label.danger-label { color: var(--vscode-errorForeground, #f48771); }
+    #overflow-menu .menu-group-label.danger-label { color: var(--vscode-errorForeground); }
     #overflow-menu .menu-group-label:not(:first-child) {
       margin-top: 4px;
       border-top: 1px solid var(--vscode-dropdown-border, var(--vscode-sideBarSectionHeader-border));
@@ -781,53 +688,48 @@ const CSS_TEMPLATE = /* css */ `
     #overflow-menu .menu-item .cmd-name {
       display: inline-block; min-width: 72px;
       font-family: var(--vscode-editor-font-family, monospace);
-      font-size: 0.92em; color: var(--gold); opacity: 0.9;
+      font-size: 0.92em; color: var(--accent); opacity: 0.9;
     }
-    #overflow-menu .menu-item:hover { background: var(--gold-subtle); }
-    #overflow-menu .menu-item.danger { color: var(--vscode-errorForeground, #f48771); }
+    #overflow-menu .menu-item:hover { background: var(--accent-subtle); }
+    #overflow-menu .menu-item.danger { color: var(--vscode-errorForeground); }
     #overflow-menu .menu-item.danger:hover { background: rgba(244, 135, 113, 0.12); }
-    #overflow-menu .menu-sep {
-      height: 1px; margin: 4px 0;
-      background: var(--vscode-dropdown-border, var(--vscode-sideBarSectionHeader-border));
-      opacity: 0.5;
-    }
 
-    /* Inline arg popover for commands that take an argument (/title …) */
-    /* Sibling of #overflow-menu inside the slash button's .btn-wrap */
+    /* Cmd arg popover */
     #cmd-arg-popover {
       position: absolute; bottom: calc(100% + 4px); left: 0;
       background: var(--vscode-dropdown-background, var(--vscode-sideBar-background));
-      border: 1px solid var(--gold-border, var(--vscode-dropdown-border));
-      border-radius: 4px; min-width: 260px; z-index: 110;
+      border: 1px solid var(--accent-border);
+      border-radius: var(--radius-md); min-width: 260px; z-index: 110;
       padding: 8px 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.4);
     }
     #cmd-arg-popover .cmd-arg-label {
       font-size: 0.7em; font-family: var(--ui-font);
-      color: var(--gold); text-transform: uppercase;
+      color: var(--accent); text-transform: uppercase;
       letter-spacing: 0.05em; margin-bottom: 4px;
     }
     #cmd-arg-popover input {
       width: 100%; box-sizing: border-box;
       background: var(--vscode-input-background);
       color: var(--vscode-input-foreground);
-      border: 1px solid var(--vscode-input-border, transparent);
+      border: 1px solid var(--vscode-input-border);
       border-radius: 3px; padding: 4px 6px;
       font-family: var(--ui-font); font-size: 0.9em;
     }
-    #cmd-arg-popover input:focus { outline: 1px solid var(--gold); outline-offset: -1px; }
+    #cmd-arg-popover input:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
     #cmd-arg-popover .cmd-arg-hint {
       font-size: 0.7em; opacity: 0.5;
       margin-top: 4px; font-family: var(--ui-font);
     }
 
-    /* Skills picker — anchored to its .btn-wrap parent (next to the ✦ button) */
+    /* Skills menu */
     #skills-menu {
       position: absolute; bottom: calc(100% + 4px); left: 0;
       background: var(--vscode-dropdown-background, var(--vscode-sideBar-background));
       border: 1px solid var(--vscode-dropdown-border, var(--vscode-sideBarSectionHeader-border));
-      border-radius: 4px; min-width: 240px; max-width: 320px;
+      border-radius: var(--radius-md); min-width: 240px; max-width: 320px;
       max-height: 350px; overflow-y: auto; z-index: 100;
+      box-shadow: 0 -2px 16px rgba(0,0,0,0.4);
     }
     .skill-group-label {
       padding: 4px 10px 2px; font-size: 0.68em; font-family: var(--ui-font);
@@ -842,10 +744,39 @@ const CSS_TEMPLATE = /* css */ `
       overflow: hidden; text-overflow: ellipsis;
       display: flex; align-items: center; gap: 6px;
     }
-    .skill-option:hover { background: var(--gold-subtle); }
-    .skill-option.selected { color: var(--gold); font-weight: 600; }
+    .skill-option:hover { background: var(--accent-subtle); }
+    .skill-option.selected { color: var(--accent); font-weight: 600; }
     .skill-option.selected::before { content: '✓ '; flex-shrink: 0; }
-    .skill-option .skill-desc {
-      opacity: 0.4; font-size: 0.85em; overflow: hidden; text-overflow: ellipsis;
+    .skill-option .skill-desc { opacity: 0.4; font-size: 0.85em; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Todo overlay */
+    #todo-overlay {
+      font-family: var(--ui-font); font-size: 0.82em;
+      margin: 0 8px 4px; padding: 6px 10px;
+      background: var(--vscode-sideBarSectionHeader-background, rgba(128,128,128,0.05));
+      border: 1px solid var(--vscode-input-border);
+      border-radius: var(--radius-lg);
+      flex-shrink: 0; display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
+    #todo-overlay .todo-header {
+      font-weight: 700; font-size: 0.78em;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 4px;
+    }
+    #todo-overlay .todo-item {
+      display: flex; align-items: flex-start; gap: 6px;
+      padding: 2px 0;
+    }
+    #todo-overlay .todo-icon { flex-shrink: 0; width: 1.2em; text-align: center; }
+    #todo-overlay .todo-icon.completed { color: #4ec9b0; }
+    #todo-overlay .todo-icon.in_progress { color: var(--accent); }
+    #todo-overlay .todo-icon.pending { opacity: 0.4; }
+    #todo-overlay .todo-text { flex: 1; }
+    #todo-overlay .todo-text.completed { text-decoration: line-through; opacity: 0.5; }
+    #todo-overlay .todo-text.in_progress { color: var(--accent); font-weight: 500; }
+    #todo-overlay .todo-summary { font-size: 0.8em; opacity: 0.5; margin-top: 3px; }
+
+    #messages { overflow-x: hidden; }
 `;

@@ -145,7 +145,7 @@ function renderTokenDisplay(
 export function updateStatusBar(
   state: WebviewState,
   els: {
-    statusVersionEl: HTMLElement; modelBtnHeader: HTMLElement;
+    statusVersionEl: HTMLElement | null; modelBtnHeader: HTMLElement;
     modelMenu: HTMLElement; statusSessionEl: HTMLElement; statusContextEl: HTMLElement;
     ctxBarWrap: HTMLElement; ctxBar: HTMLElement; ctxBarFresh: HTMLElement;
   },
@@ -153,7 +153,7 @@ export function updateStatusBar(
   contextUsed?: number, contextSize?: number, version?: string,
   cachedTokens?: number,
 ): void {
-  if (version !== undefined) els.statusVersionEl.textContent = version ? ` ${version}` : '';
+  if (version !== undefined && els.statusVersionEl) els.statusVersionEl.textContent = version ? ` ${version}` : '';
   if (model) {
     state.currentModel = model;
     let displayLabel = model;

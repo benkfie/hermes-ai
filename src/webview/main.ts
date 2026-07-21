@@ -39,7 +39,7 @@ const inputRow         = document.getElementById('input-row') as HTMLDivElement;
 const composer         = document.getElementById('composer') as HTMLDivElement;
 const statusSessionEl  = document.getElementById('status-session') as HTMLButtonElement;
 const statusContextEl  = document.getElementById('status-context')!;
-const statusVersionEl  = document.getElementById('status-version')!;
+const statusVersionEl  = document.getElementById('status-version');
 const ctxBarWrap       = document.getElementById('ctx-bar-wrap') as HTMLDivElement;
 const ctxBar           = document.getElementById('ctx-bar') as HTMLDivElement;
 const ctxBarFresh      = document.getElementById('ctx-bar-fresh') as HTMLDivElement;
@@ -49,7 +49,7 @@ const overflowBtn      = document.getElementById('overflow-btn') as HTMLButtonEl
 const overflowMenu     = document.getElementById('overflow-menu') as HTMLDivElement;
 const emptyState       = document.getElementById('empty-state') as HTMLDivElement;
 const sessionPicker    = document.getElementById('session-picker') as HTMLDivElement;
-const logoMark         = document.getElementById('logo-mark')!;
+// logoMark removed — logo no longer in template
 const todoOverlay      = document.getElementById('todo-overlay')!;
 const skillsBtn        = document.getElementById('skills-btn') as HTMLButtonElement;
 const skillsMenu       = document.getElementById('skills-menu') as HTMLDivElement;
@@ -64,7 +64,7 @@ const closeFn = () => closeAllDropdowns(dropdownEls);
 // ── Helpers ──────────────────────────────────────────
 function setBusy(active: boolean, queued = 0): void {
   S.isBusy = active;
-  logoMark.classList.toggle('busy', active);
+  // logo removed
   composer.classList.toggle('busy-glow', active);
   sendBtn.style.display = active ? 'none' : 'block';
   busyBtns.style.display = active ? 'flex' : 'none';
