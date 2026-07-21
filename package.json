@@ -1,19 +1,15 @@
 {
-  "name": "hermes-ai-agent",
+  "name": "hermes-ai",
   "displayName": "Hermes AI Agent",
-  "description": "VS Code sidebar for the Hermes AI agent. Streams chat, runs tools, manages sessions. Multi-model (Claude, Codex). Communicates over ACP.",
-  "version": "3.0.0",
-  "publisher": "joaompfp",
-  "author": "joao",
+  "description": "VS Code extension for the Hermes AI agent. ACP-powered chat, settings management, tool execution, and multi-model support.",
+  "version": "1.0.0",
+  "publisher": "benkfie",
+  "author": "benkfie",
   "license": "MIT",
   "keywords": [
     "ai agent",
     "coding assistant",
     "autonomous agent",
-    "claude",
-    "codex",
-    "copilot alternative",
-    "pair programmer",
     "llm",
     "tool use",
     "chat",
@@ -21,16 +17,15 @@
     "acp",
     "agent client protocol",
     "sidebar chat",
-    "streaming",
-    "remote ssh"
+    "streaming"
   ],
-  "homepage": "https://github.com/joaompfp/hermes-vscode",
+  "homepage": "https://github.com/benkfie/hermes-ai",
   "bugs": {
-    "url": "https://github.com/joaompfp/hermes-vscode/issues"
+    "url": "https://github.com/benkfie/hermes-ai/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/joaompfp/hermes-vscode"
+    "url": "https://github.com/benkfie/hermes-ai.git"
   },
   "icon": "resources/hermes-logo-128.png",
   "galleryBanner": {

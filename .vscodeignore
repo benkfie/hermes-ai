@@ -6,7 +6,6 @@
 !package.json
 !README.md
 !LICENSE
-!LICENSE.txt
 !CHANGELOG.md
 
 # Assets
@@ -17,3 +16,5 @@
 # Exclude internal docs
 CLAUDE.md
 CODEX-HANDOFF.md
+AGENTS.md
+.hermes.md
