@@ -19,7 +19,8 @@ if errorlevel 1 (
 )
 
 echo [Hermes AI] Installing to Antigravity IDE...
-call "antigravity-ide.cmd" --install-extension="%~dp0hermes-ai-1.0.0.vsix" 2>&1
+for /f "tokens=*" %%v in ('powershell -NoProfile -Command "(Get-Content package.json | ConvertFrom-Json).version"') do set VSIX=hermes-ai-%%v.vsix
+call "antigravity-ide.cmd" --install-extension="%~dp0%VSIX%" 2>&1
 
 echo.
 echo [Hermes AI] Done! In Antigravity IDE press:
