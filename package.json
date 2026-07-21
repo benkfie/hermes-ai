@@ -96,7 +96,7 @@
       ]
     },
     "views": {
-      "hermes": [
+      "hermes-ai": [
         {
           "type": "webview",
           "id": "hermes-ai.chatView",
