@@ -6,9 +6,16 @@ declare function acquireVsCodeApi(): { postMessage(msg: any): void; getState(): 
 
 const vscode = acquireVsCodeApi();
 
+// ── Escape HTML helper ─────────────────────────────
+function escapeHtml(text: string): string {
+  const el = document.createElement('span');
+  el.textContent = text;
+  return el.innerHTML;
+}
 
 // ── State ──────────────────────────────────────────
 let currentTab = 'general';
+let modelCatalogData: Array<{ provider: string; modelId: string; name: string; visible: boolean }> = [];
 
 // ── Tab navigation ─────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
@@ -26,8 +33,8 @@ function switchTab(name: string): void {
   document.querySelector(`.tab[data-tab="${name}"]`)?.classList.add('active');
   document.getElementById(`section-${name}`)?.classList.add('active');
 
-  // Load data for specific tabs
   if (name === 'mcp') loadMcpServers();
+  if (name === 'model') loadModelCatalog();
 }
 
 // ── Toast ──────────────────────────────────────────
@@ -77,19 +84,12 @@ function populateConfig(data: Record<string, any>): void {
 
   const statusEl = document.getElementById('hermes-status')!;
   if (data.hermesInstalled) {
-    statusEl.textContent = 'Connected \u2713 ' + (data.hermesVersion || '');
+    statusEl.textContent = 'Connected ✓ ' + (data.hermesVersion || '');
     statusEl.className = 'status-badge ok';
   } else {
     statusEl.textContent = 'Not installed';
     statusEl.className = 'status-badge err';
   }
-
-  // Model
-  setValue('model-provider', data.model?.provider);
-  setValue('model-name', data.model?.default);
-  setValue('model-baseurl', data.model?.baseUrl || '');
-  setValue('max-turns', String(data.maxTurns || 200));
-  setCheckbox('show-reasoning', data.display?.reasoning);
 
   // Terminal
   setValue('terminal-backend', data.terminal?.backend);
@@ -109,8 +109,13 @@ function populateConfig(data: Record<string, any>): void {
   if (envPathDisplay) envPathDisplay.textContent = data.envPath || '~/.hermes/.env';
   populateApiKeys(data.apiKeys || {});
 
-  // Debug
-  setCheckbox('debug-logs', data.display?.debugLogs || false);
+  // Model catalog
+  if (data.modelCatalog && Array.isArray(data.modelCatalog)) {
+    modelCatalogData = data.modelCatalog;
+    if (currentTab === 'model') {
+      renderModelCatalog(modelCatalogData);
+    }
+  }
 }
 
 function setValue(id: string, value: string): void {
@@ -146,7 +151,6 @@ function populateApiKeys(keys: Record<string, { masked: string; isSet: boolean }
       '</div>';
   }).join('');
 
-  // Wire up buttons
   list.querySelectorAll('.set-key-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const provider = (btn as HTMLElement).dataset.provider;
@@ -190,7 +194,6 @@ function populateMcpServers(servers: any[]): void {
       '</div>';
   }).join('');
 
-  // Wire up buttons
   list.querySelectorAll('.test-mcp-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const name = (btn as HTMLElement).dataset.name;
@@ -239,7 +242,6 @@ document.getElementById('add-mcp')?.addEventListener('click', () => {
     post({ type: 'addMcpServer', name, transport, url });
   }
 
-  // Clear form
   (document.getElementById('mcp-name') as HTMLInputElement).value = '';
   (document.getElementById('mcp-command') as HTMLInputElement).value = '';
   (document.getElementById('mcp-url') as HTMLInputElement).value = '';
@@ -247,23 +249,139 @@ document.getElementById('add-mcp')?.addEventListener('click', () => {
 
 // ── Save buttons ──────────────────────────────────
 document.getElementById('save-general')?.addEventListener('click', () => {
-  // Future: save hermes path, debug logs, auto-connect
   showToast('Settings saved');
 });
 
 document.getElementById('save-model')?.addEventListener('click', () => {
-  const provider = (document.getElementById('model-provider') as HTMLInputElement).value.trim();
-  const model = (document.getElementById('model-name') as HTMLInputElement).value.trim();
-  if (provider && model) {
-    post({ type: 'setModel', provider, model });
-    showToast('Model settings saved');
-  }
+  saveModelVisibility();
 });
 
 document.getElementById('save-terminal')?.addEventListener('click', () => {
-  // Future: save terminal settings
   showToast('Terminal settings saved');
 });
+
+// ── Model Catalog ─────────────────────────────────
+function loadModelCatalog(): void {
+  if (modelCatalogData && modelCatalogData.length > 0) {
+    renderModelCatalog(modelCatalogData);
+  }
+}
+
+function renderModelCatalog(catalog: Array<{ provider: string; modelId: string; name: string; visible: boolean }>): void {
+  const container = document.getElementById('model-catalog');
+  if (!container) return;
+
+  // Group by provider
+  const byProvider: Record<string, typeof catalog> = {};
+  for (const m of catalog) {
+    if (!byProvider[m.provider]) byProvider[m.provider] = [];
+    byProvider[m.provider].push(m);
+  }
+
+  const providers = Object.keys(byProvider).sort();
+  
+  let html = '';
+  
+  for (const provider of providers) {
+    const models = byProvider[provider].sort((a, b) => a.name.localeCompare(b.name));
+    const visibleCount = models.filter(m => m.visible).length;
+    const totalCount = models.length;
+    
+    html += '<div class="model-provider-group">' +
+      '<div class="model-provider-header">' +
+      '<h3 style="margin: 8px 0 4px; font-size: 13px;">' + escapeHtml(provider) + ' <span style="font-weight:normal;opacity:0.6;">(' + visibleCount + '/' + totalCount + ')</span></h3>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      '<button class="small secondary select-all" data-provider="' + escapeHtml(provider) + '">Select All</button>' +
+      '<button class="small secondary deselect-all" data-provider="' + escapeHtml(provider) + '">Deselect All</button>' +
+      '<input type="text" class="model-search" placeholder="Filter..." style="flex:1;max-width:200px;padding:2px 6px;font-size:11px;">' +
+      '</div>' +
+      '</div>' +
+      '<div class="models-list">';
+    
+    for (const m of models) {
+      html += '<div class="model-item" data-model-id="' + escapeHtml(m.modelId) + '">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;">' +
+        '<input type="checkbox" ' + (m.visible ? 'checked' : '') + ' data-provider="' + escapeHtml(m.provider) + '" data-model-id="' + escapeHtml(m.modelId) + '" style="width:16px;height:16px;">' +
+        '<span class="model-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(m.name) + '</span>' +
+        '<span class="model-id" style="font-family:monospace;font-size:10px;opacity:0.4;flex-shrink:0;">' + escapeHtml(m.modelId) + '</span>' +
+        '</label>' +
+        '</div>';
+    }
+    
+    html += '</div></div>';
+  }
+  
+  if (providers.length === 0) {
+    html = '<div class="info-text">No models found in cache. Run <code>hermes model --refresh</code> to update.</div>';
+  }
+  
+  container.innerHTML = html;
+
+  // Wire up events
+  container.querySelectorAll('input[type="checkbox"][data-model-id]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      updateProviderCount((cb as HTMLElement).closest('.model-provider-group'));
+    });
+  });
+  
+  container.querySelectorAll('.select-all').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = (btn as HTMLElement).closest('.model-provider-group');
+      group?.querySelectorAll('input[type="checkbox"][data-model-id]').forEach(cb => {
+        (cb as HTMLInputElement).checked = true;
+      });
+      updateProviderCount(group as HTMLElement | null);
+    });
+  });
+  
+  container.querySelectorAll('.deselect-all').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = (btn as HTMLElement).closest('.model-provider-group');
+      group?.querySelectorAll('input[type="checkbox"][data-model-id]').forEach(cb => {
+        (cb as HTMLInputElement).checked = false;
+      });
+      updateProviderCount(group as HTMLElement | null);
+    });
+  });
+  
+  container.querySelectorAll('.model-search').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const query = (e.target as HTMLInputElement).value.toLowerCase();
+      const group = (e.target as HTMLElement).closest('.model-provider-group');
+      group?.querySelectorAll('.model-item').forEach(item => {
+        const name = item.querySelector('.model-name')?.textContent?.toLowerCase() || '';
+        const id = item.querySelector('.model-id')?.textContent?.toLowerCase() || '';
+        (item as HTMLElement).style.display = (name.includes(query) || id.includes(query)) ? '' : 'none';
+      });
+    });
+  });
+}
+
+function updateProviderCount(group: HTMLElement | null): void {
+  if (!group) return;
+  const checkboxes = group.querySelectorAll('input[type="checkbox"][data-model-id]');
+  let visible = 0;
+  checkboxes.forEach(cb => { if ((cb as HTMLInputElement).checked) visible++; });
+  const total = checkboxes.length;
+  const countEl = group.querySelector('h3 span');
+  if (countEl) countEl.textContent = '(' + visible + '/' + total + ')';
+}
+
+function saveModelVisibility(): void {
+  const checkboxes = document.querySelectorAll('input[type="checkbox"][data-model-id]');
+  const visibility: Record<string, boolean> = {};
+  
+  checkboxes.forEach(cb => {
+    const provider = (cb as HTMLInputElement).dataset.provider;
+    const modelId = (cb as HTMLInputElement).dataset.modelId;
+    if (provider && modelId) {
+      visibility[provider + '::' + modelId] = (cb as HTMLInputElement).checked;
+    }
+  });
+  
+  post({ type: 'saveModelVisibility', visibility });
+  showToast('Model visibility saved');
+}
 
 // ── About buttons ─────────────────────────────────
 document.getElementById('run-doctor')?.addEventListener('click', () => {
@@ -277,11 +395,7 @@ document.getElementById('browse-hermes')?.addEventListener('click', () => {
 });
 
 // ── Helpers ───────────────────────────────────────
-function escapeHtml(text: string): string {
-  const el = document.createElement('span');
-  el.textContent = text;
-  return el.innerHTML;
-}
+
 
 // ── Init ──────────────────────────────────────────
 post({ type: 'ready' });

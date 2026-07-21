@@ -6,6 +6,7 @@
  */
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as os from 'os';
 import * as fs from 'fs';
 import {
   getConfig,
@@ -33,13 +34,59 @@ type SettingsMessage =
   | { type: 'getMcpServers' }
   | { type: 'addMcpServer'; name: string; transport: string; command?: string; url?: string }
   | { type: 'removeMcpServer'; name: string }
-  | { type: 'testMcpServer'; name: string };
+  | { type: 'testMcpServer'; name: string }
+  | { type: 'saveModelVisibility'; visibility: Record<string, boolean> };
 
 type SettingsResponse =
   | { type: 'config'; data: Record<string, unknown> }
   | { type: 'error'; message: string }
   | { type: 'mcpServers'; servers: any[] }
   | { type: 'mcpTestResult'; name: string; ok: boolean; message: string };
+
+/**
+ * Load the full model catalog from Hermes cache file.
+ * Returns a flat array of { provider, modelId, name, visible }.
+ */
+function loadModelCatalog(): Array<{ provider: string; modelId: string; name: string; visible: boolean }> {
+  const cachePath = path.join(os.homedir(), '.hermes', 'models_dev_cache.json');
+  if (!fs.existsSync(cachePath)) {
+    return [];
+  }
+  try {
+    const raw = fs.readFileSync(cachePath, 'utf8');
+    const cache = JSON.parse(raw) as Record<string, { name?: string; models?: Record<string, { id: string; name?: string }> }>;
+    
+    // Load existing visibility settings
+    const visibilityPath = path.join(os.homedir(), '.hermes', 'model_visibility.json');
+    let visibility: Record<string, boolean> = {};
+    if (fs.existsSync(visibilityPath)) {
+      visibility = JSON.parse(fs.readFileSync(visibilityPath, 'utf8'));
+    }
+    
+    const results: Array<{ provider: string; modelId: string; name: string; visible: boolean }> = [];
+    
+    for (const [providerId, providerData] of Object.entries(cache)) {
+      const models = providerData?.models;
+      if (!models || Object.keys(models).length === 0) continue;
+      
+      const providerName = providerData.name || providerId;
+      
+      for (const [modelId, modelData] of Object.entries(models)) {
+        const key = providerId + '::' + modelId;
+        results.push({
+          provider: providerName,
+          modelId,
+          name: modelData.name || modelId,
+          visible: visibility[key] ?? true,  // default visible
+        });
+      }
+    }
+    
+    return results;
+  } catch {
+    return [];
+  }
+}
 
 export class SettingsPanelProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = 'hermes-ai.settingsView';
@@ -67,7 +114,6 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  /** Post a message to the settings webview. */
   private post(msg: SettingsResponse): void {
     this.view?.webview.postMessage(msg);
   }
@@ -80,6 +126,7 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
           // Send everything the settings UI needs
           const config = getConfig();
           const envEntries = readEnv();
+          const modelCatalog = loadModelCatalog();
 
           this.post({
             type: 'config',
@@ -99,6 +146,7 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
               hermesVersion: getHermesVersion(),
               configPath: getConfigPath(),
               envPath: getEnvPath(),
+              modelCatalog: modelCatalog,
             },
           });
           break;
@@ -106,7 +154,6 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
 
         case 'setConfig': {
           setConfig(msg.key, msg.value);
-          // Send updated config back
           await this.handleMessage({ type: 'getConfig' });
           break;
         }
@@ -126,6 +173,11 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
         case 'removeApiKey': {
           removeApiKey(msg.provider);
           await this.handleMessage({ type: 'getConfig' });
+          break;
+        }
+
+        case 'saveModelVisibility': {
+          this.saveModelVisibility(msg.visibility);
           break;
         }
 
@@ -165,6 +217,18 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Save model visibility settings to ~/.hermes/model_visibility.json
+   */
+  private saveModelVisibility(visibility: Record<string, boolean>): void {
+    try {
+      const visibilityPath = path.join(os.homedir(), '.hermes', 'model_visibility.json');
+      fs.writeFileSync(visibilityPath, JSON.stringify(visibility, null, 2), 'utf8');
+    } catch (err) {
+      this.post({ type: 'error', message: `Failed to save model visibility: ${err}` });
+    }
+  }
+
+  /**
    * Build the self-contained HTML for the settings webview.
    * Uses vanilla JS + CSS with tabbed layout.
    */
@@ -180,7 +244,7 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'unsafe-inline';">
-  <title>Hermes Settings</title>
+  <title>Hermes AI Settings</title>
   <style>
     :root {
       --bg: var(--vscode-sideBar-background, #1e1e1e);
@@ -219,7 +283,6 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
       height: 100vh;
     }
 
-    /* ── Sidebar tabs ── */
     .sidebar {
       width: 120px;
       border-right: 1px solid var(--border);
@@ -247,7 +310,6 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
     .tab:hover { background: var(--tab-hover); }
     .tab.active { background: var(--tab-active); color: var(--tab-active-fg); }
 
-    /* ── Content area ── */
     .content {
       flex: 1;
       overflow-y: auto;
@@ -265,9 +327,7 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
       border-bottom: 1px solid var(--border);
     }
 
-    .field {
-      margin-bottom: 14px;
-    }
+    .field { margin-bottom: 14px; }
 
     .field label {
       display: block;
@@ -376,27 +436,70 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
       gap: 4px;
     }
 
-    .mcp-server-row {
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border);
-    }
+    .model-provider-group { margin-bottom: 16px; }
 
-    .mcp-server-header {
+    .model-provider-header {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
     }
 
-    .mcp-server-name {
+    .model-provider-header h3 {
+      margin: 0;
+      font-size: 13px;
       font-weight: 600;
-      flex: 1;
     }
 
-    .info-text {
-      font-size: 12px;
-      color: var(--vscode-descriptionForeground, #999);
-      margin-top: 4px;
+    .provider-count {
+      font-weight: normal;
+      opacity: 0.6;
+    }
+
+    .model-search {
+      flex: 1;
+      max-width: 200px;
+      padding: 2px 6px;
+      font-size: 11px;
+      background: var(--input-bg);
+      color: var(--input-fg);
+      border: 1px solid var(--input-border);
+      border-radius: 2px;
+    }
+
+    .models-list { display: flex; flex-direction: column; gap: 2px; }
+
+    .model-item {
+      padding: 4px 0;
+    }
+
+    .model-item label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+
+    .model-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .model-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .model-id {
+      font-family: monospace;
+      font-size: 10px;
+      opacity: 0.4;
+      flex-shrink: 0;
     }
 
     .spacer { margin-top: 20px; }
@@ -420,6 +523,40 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    .info-text {
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground, #999);
+      margin-top: 4px;
+    }
+
+    .mcp-server-row {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mcp-server-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .mcp-server-name {
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .catalog-header {
+      display: flex;
+      gap: 8px;
+      padding: 8px 0;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground, #999);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
     }
   </style>
 </head>
@@ -468,31 +605,17 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
 
       <!-- Model -->
       <div class="section" id="section-model">
-        <h2>Model Settings</h2>
-        <div class="field">
-          <label>Provider</label>
-          <input type="text" id="model-provider" placeholder="openrouter" />
-        </div>
-        <div class="field">
-          <label>Default Model</label>
-          <input type="text" id="model-name" placeholder="deepseek/deepseek-v4-flash" />
-        </div>
-        <div class="field">
-          <label>Base URL (optional, for custom providers)</label>
-          <input type="text" id="model-baseurl" placeholder="http://127.0.0.1:1234/v1" />
-        </div>
-        <div class="field">
-          <label>Max Turns</label>
-          <input type="number" id="max-turns" min="10" max="500" />
-        </div>
+        <h2>Model Visibility</h2>
+        <p class="info-text">Toggle which models appear in the chat model dropdown. Changes take effect immediately.</p>
         <div class="field">
           <label>
-            <input type="checkbox" id="show-reasoning" />
-            Show reasoning
+            <input type="checkbox" id="model-search-filter" />
+            Show search/filter box
           </label>
         </div>
+        <div id="model-catalog"></div>
         <div class="spacer">
-          <button id="save-model">Save Changes</button>
+          <button id="save-model">Save Visibility</button>
         </div>
       </div>
 
