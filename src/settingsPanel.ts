@@ -34,7 +34,7 @@ type SettingsResponse =
  * Load the full model catalog from Hermes cache file.
  * Returns a flat array of { provider, modelId, name, visible }.
  */
-function loadModelCatalog(): Array<{ provider: string; modelId: string; name: string; visible: boolean }> {
+function loadModelCatalog(): Array<{ provider: string; providerId: string; modelId: string; name: string; visible: boolean }> {
   const cachePath = path.join(os.homedir(), '.hermes', 'models_dev_cache.json');
   const envPath = path.join(os.homedir(), '.hermes', '.env');
   
@@ -104,7 +104,7 @@ function loadModelCatalog(): Array<{ provider: string; modelId: string; name: st
       visibility = JSON.parse(fs.readFileSync(visibilityPath, 'utf8'));
     }
     
-    const results: Array<{ provider: string; modelId: string; name: string; visible: boolean }> = [];
+    const results: Array<{ provider: string; providerId: string; modelId: string; name: string; visible: boolean }> = [];
     
     // Add models from active cached providers
     for (const providerId of activeCacheIds) {
@@ -120,6 +120,7 @@ function loadModelCatalog(): Array<{ provider: string; modelId: string; name: st
         const key = providerId + '::' + modelId;
         results.push({
           provider: providerName,
+          providerId: providerId,
           modelId,
           name: modelData.name || modelId,
           visible: visibility[key] ?? true,
@@ -127,7 +128,7 @@ function loadModelCatalog(): Array<{ provider: string; modelId: string; name: st
       }
     }
     
-    // Add local LM Studio models if base URL is configured
+    // Also add lmstudio if LM_BASE_URL is set but lmstudio wasn't in the activeCacheIds
     if (localBaseUrl) {
       const lmStudio = cache['lmstudio'];
       if (lmStudio?.models) {
@@ -135,6 +136,7 @@ function loadModelCatalog(): Array<{ provider: string; modelId: string; name: st
           const key = 'lmstudio::' + modelId;
           results.push({
             provider: 'LM Studio (Local)',
+            providerId: 'lmstudio',
             modelId,
             name: modelData.name || modelId,
             visible: visibility[key] ?? true,
@@ -504,6 +506,9 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
       <div class="section" id="section-model">
         <h2>Model Visibility</h2>
         <p class="info-text">Toggle which models appear in the chat model dropdown. Changes take effect immediately.</p>
+        <div style="margin-bottom: 12px;">
+          <input type="text" id="model-vis-search" placeholder="Search models..." style="width:100%;padding:6px 8px;background:var(--input-bg);color:var(--input-fg);border:1px solid var(--input-border);border-radius:2px;font-size:13px;font-family:var(--vscode-editor-font-family, monospace);">
+        </div>
         <div id="model-catalog"></div>
         <div class="spacer">
           <button id="save-model">Save Visibility</button>

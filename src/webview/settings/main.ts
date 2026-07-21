@@ -15,7 +15,7 @@ function escapeHtml(text: string): string {
 
 // --- State ------------------------------------------------
 let currentTab = 'general';
-let modelCatalogData: Array<{ provider: string; modelId: string; name: string; visible: boolean }> = [];
+let modelCatalogData: Array<{ provider: string; providerId?: string; modelId: string; name: string; visible: boolean }> = [];
 
 // --- Tab navigation ---------------------------------------
 document.querySelectorAll('.tab').forEach(tab => {
@@ -136,7 +136,7 @@ function loadModelCatalog(): void {
   }
 }
 
-function renderModelCatalog(catalog: Array<{ provider: string; modelId: string; name: string; visible: boolean }>): void {
+function renderModelCatalog(catalog: Array<{ provider: string; providerId?: string; modelId: string; name: string; visible: boolean }>): void {
   const container = document.getElementById('model-catalog');
   if (!container) return;
 
@@ -157,12 +157,13 @@ function renderModelCatalog(catalog: Array<{ provider: string; modelId: string; 
     const models = byProvider[provider].sort((a, b) => a.name.localeCompare(b.name));
     const safeProvider = escapeHtml(provider);
     
-    html += `<div class="provider-section" data-provider="${safeProvider}">`;
+    const safeProviderId = escapeHtml(models[0]?.providerId || provider);
+    html += `<div class="provider-section" data-provider="${safeProviderId}">`;
     html += `<div class="provider-header">`;
     html += `<h3>${safeProvider}</h3>`;
     html += `<div class="provider-actions">`;
-    html += `<button class="small secondary select-all" data-provider="${safeProvider}">Select All</button>`;
-    html += `<button class="small secondary deselect-all" data-provider="${safeProvider}">Deselect All</button>`;
+    html += `<button class="small secondary select-all" data-provider="${safeProviderId}">Select All</button>`;
+    html += `<button class="small secondary deselect-all" data-provider="${safeProviderId}">Deselect All</button>`;
     html += `</div></div>`;
     html += `<div class="model-list">`;
     
@@ -170,7 +171,7 @@ function renderModelCatalog(catalog: Array<{ provider: string; modelId: string; 
       const checked = m.visible ? 'checked' : '';
       html += `
         <label style="display: block; margin: 4px 0;">
-          <input type="checkbox" data-provider="${safeProvider}" data-model-id="${escapeHtml(m.modelId)}" ${checked} style="margin-right: 8px;">
+          <input type="checkbox" data-provider="${safeProviderId}" data-model-id="${escapeHtml(m.modelId)}" ${checked} style="margin-right: 8px;">
           ${escapeHtml(m.name)}
         </label>
       `;
