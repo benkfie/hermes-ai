@@ -578,10 +578,14 @@ window.addEventListener('message', (e: MessageEvent) => {
       break;
 
     case 'clear':
-      messagesEl.innerHTML = '';
+      // Only remove message elements, not the empty-state container.
+      // innerHTML = '' destroys #empty-state which breaks subsequent loadHistory.
+      messagesEl.querySelectorAll('.msg, .thinking-block, .history-divider, .status-line, .msg\.terminal, #waiting, #turn-thinking').forEach((el: Element) => el.remove());
+      document.getElementById('empty-state')!.style.display = 'flex';
       S.pendingQueuedTexts = []; S.prevQueueCount = 0; S.knownContextSize = 0; S.flushScheduled = false;
       ctxBarWrap.style.display = 'none';
       S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.thinkingText = ''; S.pendingText = '';
+      S.terminalBlocks.clear();
       setBusy(false);
       statusContextEl.textContent = ''; statusContextEl.className = '';
       break;
