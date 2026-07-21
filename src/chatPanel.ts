@@ -108,7 +108,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
           });
 
           // Open edited/read files + show diff on completion
-          if (event.toolStatus === 'completed' && event.toolCallId) {
+          if ((event.toolStatus === 'completed' || event.toolStatus === 'done') && event.toolCallId) {
             const info = this.toolCallLocations.get(event.toolCallId);
             if (info && info.paths.length > 0 && (info.kind === 'edit' || info.kind === 'read')) {
               for (const filePath of info.paths) {

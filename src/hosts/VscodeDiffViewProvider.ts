@@ -18,18 +18,22 @@ export interface DiffEdit {
  * Uses a temp file for the "modified" side + the original as "original" side.
  */
 export async function showDiff(edit: DiffEdit): Promise<boolean> {
-  const originalUri = vscode.Uri.file(edit.filePath).with({ scheme: 'file' });
-
-  // Write new content to a temp file for the diff view
+  // Write BOTH original and new content to temp files.
+  // The real file was already modified by the agent, so we can't use it
+  // as the "original" side — it now contains the new content.
   const tmpDir = path.join(
     path.dirname(edit.filePath),
     '.hermes-diffs',
   );
   fs.mkdirSync(tmpDir, { recursive: true });
 
-  const tmpFile = path.join(tmpDir, path.basename(edit.filePath) + '.hermes-edit');
-  fs.writeFileSync(tmpFile, edit.newContent, 'utf8');
-  const modifiedUri = vscode.Uri.file(tmpFile);
+  const tmpOrig = path.join(tmpDir, path.basename(edit.filePath) + '.hermes-orig');
+  const tmpNew  = path.join(tmpDir, path.basename(edit.filePath) + '.hermes-edit');
+  fs.writeFileSync(tmpOrig, edit.originalContent, 'utf8');
+  fs.writeFileSync(tmpNew, edit.newContent, 'utf8');
+
+  const originalUri = vscode.Uri.file(tmpOrig);
+  const modifiedUri = vscode.Uri.file(tmpNew);
 
   const title = edit.title
     ? `Hermes: ${edit.title} — ${path.basename(edit.filePath)}`
@@ -49,15 +53,17 @@ export async function showDiff(edit: DiffEdit): Promise<boolean> {
   );
 
   if (choice === accept) {
-    // Apply the changes
-    fs.writeFileSync(edit.filePath, edit.newContent, 'utf8');
-    // Clean up temp file
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    // File was already written by the agent; no need to write again.
+    // Just clean up temp files.
+    try { fs.unlinkSync(tmpOrig); } catch { /* ignore */ }
+    try { fs.unlinkSync(tmpNew); } catch { /* ignore */ }
     return true;
   }
 
-  // Rejected — clean up
-  try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+  // Rejected — restore original content to the real file
+  fs.writeFileSync(edit.filePath, edit.originalContent, 'utf8');
+  try { fs.unlinkSync(tmpOrig); } catch { /* ignore */ }
+  try { fs.unlinkSync(tmpNew); } catch { /* ignore */ }
   return false;
 }
 
