@@ -78,31 +78,47 @@ function readConfiguredHermesPath(): { value: string; workspaceOverrideIgnored: 
   const hermesConfig = vscode.workspace.getConfiguration('hermes');
   const inspected = hermesConfig.inspect<string>('path');
   const workspaceOverrideIgnored = !!(inspected?.workspaceValue || inspected?.workspaceFolderValue);
-  const value = inspected?.globalValue ?? inspected?.defaultValue ?? 'hermes';
+  // Try all scopes: global first (for security), then workspace, then default
+  const value = inspected?.globalValue
+    ?? inspected?.workspaceValue
+    ?? inspected?.defaultValue
+    ?? 'hermes';
   return { value, workspaceOverrideIgnored };
 }
 
 function resolveHermesBinary(configuredPath: string): string {
   let hermesPath = configuredPath;
+  const isWindows = process.platform === 'win32';
 
   if (hermesPath !== 'hermes' && !path.isAbsolute(hermesPath)) {
     throw new Error('hermes.path must be an absolute path or the default "hermes" value');
   }
 
   if (hermesPath === 'hermes') {
+    // Try to find via PATH
     try {
-      const resolved = execFileSync('which', ['hermes'], { timeout: 3000, encoding: 'utf8' }).trim();
-      if (resolved) hermesPath = resolved;
+      const whichCmd = isWindows ? 'where' : 'which';
+      const resolved = execFileSync(whichCmd, ['hermes'], { timeout: 3000, encoding: 'utf8' }).trim();
+      // 'where' on Windows may return multiple lines; take the first
+      if (resolved) hermesPath = resolved.split(/\r?\n/)[0].trim();
     } catch {
       // not in PATH
     }
 
     if (hermesPath === 'hermes') {
-      const tryPaths = [
-        path.join(os.homedir(), '.local', 'bin', 'hermes'),
-        '/usr/local/bin/hermes',
-        '/usr/bin/hermes',
-      ];
+      // Check known locations by platform
+      const tryPaths = isWindows
+        ? [
+            path.join(os.homedir(), 'AppData', 'Local', 'hermes', 'hermes-agent', 'hermes.exe'),
+            path.join(os.homedir(), 'AppData', 'Local', 'hermes', 'hermes.exe'),
+            path.join(os.homedir(), '.hermes', 'bin', 'hermes.exe'),
+            'C:\\Program Files\\hermes\\hermes.exe',
+          ]
+        : [
+            path.join(os.homedir(), '.local', 'bin', 'hermes'),
+            '/usr/local/bin/hermes',
+            '/usr/bin/hermes',
+          ];
       for (const candidate of tryPaths) {
         try {
           if (fs.existsSync(candidate)) {
@@ -117,10 +133,10 @@ function resolveHermesBinary(configuredPath: string): string {
   }
 
   if (!path.isAbsolute(hermesPath)) {
-    throw new Error(`Unable to resolve hermes binary from setting "${configuredPath}"`);
+    throw new Error(`Unable to resolve hermes binary from setting "${configuredPath}". Set the full path in VS Code User Settings → Hermes: Path.`);
   }
   if (!fs.existsSync(hermesPath)) {
-    throw new Error(`Configured hermes binary does not exist: ${hermesPath}`);
+    throw new Error(`Configured hermes binary does not exist: ${hermesPath}. Check your Hermes: Path setting.`);
   }
 
   return hermesPath;

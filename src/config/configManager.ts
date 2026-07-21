@@ -61,7 +61,13 @@ const SECTION_MAP: Record<string, string> = {
  * 2. Fall back to "hermes" (rely on PATH)
  */
 export function getHermesPath(): string {
-  const configured = vscode.workspace.getConfiguration('hermes').get<string>('path');
+  const hermesConfig = vscode.workspace.getConfiguration('hermes');
+  const inspected = hermesConfig.inspect<string>('path');
+  // Try all scopes: global, workspace, then default
+  const configured = inspected?.globalValue
+    ?? inspected?.workspaceValue
+    ?? inspected?.defaultValue
+    ?? 'hermes';
   if (configured && configured !== 'hermes') {
     return configured;
   }
