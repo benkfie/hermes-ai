@@ -50,47 +50,47 @@
   "contributes": {
     "commands": [
       {
-        "command": "hermes.openChat",
+        "command": "hermes-ai.openChat",
         "title": "Hermes: Open Chat"
       },
       {
-        "command": "hermes.newSession",
+        "command": "hermes-ai.newSession",
         "title": "Hermes: New Session"
       },
       {
-        "command": "hermes.openSettings",
+        "command": "hermes-ai.openSettings",
         "title": "Hermes: Open Settings"
       },
       {
-        "command": "hermes.addToChat",
+        "command": "hermes-ai.addToChat",
         "title": "Hermes: Add to Chat"
       },
       {
-        "command": "hermes.explainCode",
+        "command": "hermes-ai.explainCode",
         "title": "Hermes: Explain Code"
       },
       {
-        "command": "hermes.fixCode",
+        "command": "hermes-ai.fixCode",
         "title": "Hermes: Fix Code"
       },
       {
-        "command": "hermes.improveCode",
+        "command": "hermes-ai.improveCode",
         "title": "Hermes: Improve Code"
       },
       {
-        "command": "hermes.addTerminalOutput",
+        "command": "hermes-ai.addTerminalOutput",
         "title": "Hermes: Add Terminal Output to Chat"
       },
       {
-        "command": "hermes.generateCommitMsg",
+        "command": "hermes-ai.generateCommitMsg",
         "title": "Hermes: Generate Commit Message"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "hermes",
-          "title": "Hermes Agent",
+          "id": "hermes-ai",
+          "title": "Hermes AI",
           "icon": "resources/hermes-icon.svg"
         }
       ]
@@ -99,31 +99,31 @@
       "hermes": [
         {
           "type": "webview",
-          "id": "hermes.chatView",
+          "id": "hermes-ai.chatView",
           "name": "Chat"
         },
         {
           "type": "webview",
-          "id": "hermes.settingsView",
+          "id": "hermes-ai.settingsView",
           "name": "Settings"
         }
       ]
     },
     "configuration": {
-      "title": "Hermes",
+      "title": "Hermes AI",
       "properties": {
-        "hermes.path": {
+        "hermes-ai.path": {
           "type": "string",
           "default": "hermes",
           "scope": "machine-overridable",
           "description": "Trusted absolute path to the Hermes binary."
         },
-        "hermes.debugLogs": {
+        "hermes-ai.debugLogs": {
           "type": "boolean",
           "default": false,
           "description": "Enable diagnostic ACP logs in the Hermes output channel."
         },
-        "hermes.autoConnect": {
+        "hermes-ai.autoConnect": {
           "type": "boolean",
           "default": true,
           "description": "Automatically connect to Hermes when VS Code starts"
@@ -133,47 +133,47 @@
     "menus": {
       "editor/context": [
         {
-          "command": "hermes.addToChat",
+          "command": "hermes-ai.addToChat",
           "group": "Hermes@1",
           "when": "editorHasSelection"
         },
         {
-          "command": "hermes.explainCode",
+          "command": "hermes-ai.explainCode",
           "group": "Hermes@2",
           "when": "editorHasSelection"
         },
         {
-          "command": "hermes.fixCode",
+          "command": "hermes-ai.fixCode",
           "group": "Hermes@3",
           "when": "editorHasSelection"
         },
         {
-          "command": "hermes.improveCode",
+          "command": "hermes-ai.improveCode",
           "group": "Hermes@4",
           "when": "editorHasSelection"
         }
       ],
       "terminal/context": [
         {
-          "command": "hermes.addTerminalOutput",
+          "command": "hermes-ai.addTerminalOutput",
           "group": "Hermes@1"
         }
       ],
       "scm/title": [
         {
-          "command": "hermes.generateCommitMsg",
+          "command": "hermes-ai.generateCommitMsg",
           "group": "navigation@1"
         }
       ]
     },
     "keybindings": [
       {
-        "command": "hermes.openChat",
+        "command": "hermes-ai.openChat",
         "key": "ctrl+`",
         "mac": "cmd+`"
       },
       {
-        "command": "hermes.openSettings",
+        "command": "hermes-ai.openSettings",
         "key": "ctrl+shift+`",
         "mac": "cmd+shift+`"
       }

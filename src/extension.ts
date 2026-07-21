@@ -12,7 +12,7 @@ import { requestPermission } from './PermissionApproval';
 import { showDiff, previewEdit } from './hosts/VscodeDiffViewProvider';
 
 const DEFAULT_SONNET_MODEL = 'claude-sonnet-4-6';
-const APPROVED_BINARIES_KEY = 'hermes.approvedBinaries';
+const APPROVED_BINARIES_KEY = 'hermes-ai.approvedBinaries';
 
 function extractModelFromHermesConfig(content: string): string | null {
   const lines = content.split(/\r?\n/);
@@ -75,7 +75,7 @@ function readHermesVersion(hermesPath: string): string {
 }
 
 function readConfiguredHermesPath(): { value: string; workspaceOverrideIgnored: boolean } {
-  const hermesConfig = vscode.workspace.getConfiguration('hermes');
+  const hermesConfig = vscode.workspace.getConfiguration('hermes-ai');
   const inspected = hermesConfig.inspect<string>('path');
   const workspaceOverrideIgnored = !!(inspected?.workspaceValue || inspected?.workspaceFolderValue);
   // Try all scopes: global first (for security), then workspace, then default
@@ -215,7 +215,7 @@ let client: AcpClient | null = null;
 let outputChannel: vscode.OutputChannel;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  outputChannel = vscode.window.createOutputChannel('Hermes');
+  outputChannel = vscode.window.createOutputChannel('Hermes AI');
   context.subscriptions.push(outputChannel);
 
   const configuredHermes = readConfiguredHermesPath();
@@ -234,7 +234,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     outputChannel.appendLine(`[security] invalid Hermes binary: ${err}`);
   }
 
-  const hermesConfig = vscode.workspace.getConfiguration('hermes');
+  const hermesConfig = vscode.workspace.getConfiguration('hermes-ai');
   const debugLogs = hermesConfig.get<boolean>('debugLogs', false);
 
   client = new AcpClient(
@@ -311,21 +311,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Commands
   context.subscriptions.push(
-    vscode.commands.registerCommand('hermes.openChat', async () => {
+    vscode.commands.registerCommand('hermes-ai.openChat', async () => {
       outputChannel.appendLine('[ui] open chat');
-      await vscode.commands.executeCommand('hermes.chatView.focus');
+      await vscode.commands.executeCommand('hermes-ai.chatView.focus');
       await ensureConnected();
     }),
 
-    vscode.commands.registerCommand('hermes.newSession', () => {
+    vscode.commands.registerCommand('hermes-ai.newSession', () => {
       outputChannel.appendLine('[ui] new session');
       session.reset();
       panel.post({ type: 'clear' });
     }),
 
-    vscode.commands.registerCommand('hermes.openSettings', async () => {
+    vscode.commands.registerCommand('hermes-ai.openSettings', async () => {
       outputChannel.appendLine('[ui] open settings');
-      await vscode.commands.executeCommand('hermes.settingsView.focus');
+      await vscode.commands.executeCommand('hermes-ai.settingsView.focus');
     }),
   );
 
@@ -335,7 +335,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     100,
   );
   statusItem.text = '$(circle-outline) Hermes';
-  statusItem.command = 'hermes.openChat';
+  statusItem.command = 'hermes-ai.openChat';
   statusItem.show();
   context.subscriptions.push(statusItem);
 

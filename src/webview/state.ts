@@ -13,6 +13,7 @@ export interface WebviewState {
   currentAgentEl: HTMLElement | null;
   currentAgentText: string;
   thinkingStatusEl: HTMLElement | null;
+  thinkingText: string;
   pendingText: string;
   flushScheduled: boolean;
   markdownDebounceTimer: ReturnType<typeof setTimeout> | null;
@@ -39,6 +40,7 @@ export function createInitialState(): WebviewState {
     currentAgentEl: null,
     currentAgentText: '',
     thinkingStatusEl: null,
+    thinkingText: '',
     pendingText: '',
     flushScheduled: false,
     markdownDebounceTimer: null,

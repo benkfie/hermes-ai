@@ -15,7 +15,7 @@ import { buildChatHtml, escapeHtml } from './htmlTemplate';
 import type { StoredMessage, ToWebview, FromWebview } from './types';
 
 export class ChatPanelProvider implements vscode.WebviewViewProvider {
-  public static readonly viewId = 'hermes.chatView';
+  public static readonly viewId = 'hermes-ai.chatView';
 
   private view?: vscode.WebviewView;
   private busy = false;

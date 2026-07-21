@@ -13,7 +13,7 @@ import { execSync } from 'child_process';
  */
 export function detectHermes(): string | null {
   // Check VS Code setting
-  const configured = vscode.workspace.getConfiguration('hermes').get<string>('path');
+  const configured = vscode.workspace.getConfiguration('hermes-ai').get<string>('path');
   if (configured && configured !== 'hermes' && fs.existsSync(configured)) {
     return configured;
   }

@@ -177,7 +177,47 @@ ${CSS_TEMPLATE}
   </div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
-</html>`;
+</html>
+    /* ── Thinking block ────────────────────────────── */
+    .thinking-block {
+      font-style: italic;
+      color: var(--vscode-descriptionForeground);
+      opacity: 0.85;
+      padding: 6px 10px;
+      border-left: 3px solid var(--accent);
+      margin: 2px 0;
+      background: var(--accent-subtle);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      font-family: var(--ui-font);
+      font-size: 0.85em;
+      line-height: 1.4;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .thinking-block p { margin: 0.2em 0; }
+    .thinking-block blockquote {
+      margin: 0; padding: 0; border: none; opacity: 1;
+      font-style: italic;
+    }
+    .thinking-collapsed {
+      max-height: 2em;
+      overflow: hidden;
+      opacity: 0.5;
+      cursor: pointer;
+      padding: 4px 10px;
+      border-left: 3px solid var(--accent);
+      background: var(--accent-subtle);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      font-family: var(--ui-font);
+      font-size: 0.8em;
+      font-style: italic;
+      color: var(--vscode-descriptionForeground);
+      transition: max-height 0.3s, opacity 0.2s;
+      user-select: none;
+    }
+    .thinking-collapsed:hover { opacity: 0.7; }
+    .thinking-collapsed::after { content: ' (click to expand)'; font-size: 0.8em; opacity: 0.5; }
+`;
 }
 
 // ── CSS ──────────────────────────────────────────────

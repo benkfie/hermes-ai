@@ -9,7 +9,7 @@ import * as vscode from 'vscode';
 import { execSync } from 'child_process';
 import type { ChatSession, StoredMessage } from './types';
 
-const SESSIONS_KEY = 'hermes.sessions';
+const SESSIONS_KEY = 'hermes-ai.sessions';
 const MAX_SESSIONS = 20;
 const MAX_MESSAGES_PER_SESSION = 300;
 

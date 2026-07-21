@@ -15,7 +15,7 @@ export function registerContextCommands(
 
   // ── Add to Chat ──────────────────────────────
   disposables.push(
-    vscode.commands.registerTextEditorCommand('hermes.addToChat', (editor) => {
+    vscode.commands.registerTextEditorCommand('hermes-ai.addToChat', (editor) => {
       const selection = editor.selection;
       const text = editor.document.getText(selection);
       const filePath = vscode.workspace.asRelativePath(editor.document.uri);
@@ -33,7 +33,7 @@ export function registerContextCommands(
 
   // ── Explain Code ─────────────────────────────
   disposables.push(
-    vscode.commands.registerTextEditorCommand('hermes.explainCode', (editor) => {
+    vscode.commands.registerTextEditorCommand('hermes-ai.explainCode', (editor) => {
       const selection = editor.selection;
       const text = editor.document.getText(selection);
       const filePath = vscode.workspace.asRelativePath(editor.document.uri);
@@ -47,7 +47,7 @@ export function registerContextCommands(
 
   // ── Fix Code ─────────────────────────────────
   disposables.push(
-    vscode.commands.registerTextEditorCommand('hermes.fixCode', (editor) => {
+    vscode.commands.registerTextEditorCommand('hermes-ai.fixCode', (editor) => {
       const selection = editor.selection;
       const text = editor.document.getText(selection);
       const filePath = vscode.workspace.asRelativePath(editor.document.uri);
@@ -60,7 +60,7 @@ export function registerContextCommands(
 
   // ── Improve Code ─────────────────────────────
   disposables.push(
-    vscode.commands.registerTextEditorCommand('hermes.improveCode', (editor) => {
+    vscode.commands.registerTextEditorCommand('hermes-ai.improveCode', (editor) => {
       const selection = editor.selection;
       const text = editor.document.getText(selection);
       const filePath = vscode.workspace.asRelativePath(editor.document.uri);
@@ -73,7 +73,7 @@ export function registerContextCommands(
 
   // ── Add Terminal Output ──────────────────────
   disposables.push(
-    vscode.commands.registerCommand('hermes.addTerminalOutput', () => {
+    vscode.commands.registerCommand('hermes-ai.addTerminalOutput', () => {
       const terminal = vscode.window.activeTerminal;
       if (!terminal) {
         vscode.window.showWarningMessage('No active terminal to capture output from.');
@@ -89,7 +89,7 @@ export function registerContextCommands(
 
   // ── Generate Commit Message ──────────────────
   disposables.push(
-    vscode.commands.registerCommand('hermes.generateCommitMsg', async () => {
+    vscode.commands.registerCommand('hermes-ai.generateCommitMsg', async () => {
       const gitExtension = vscode.extensions.getExtension('vscode.git');
       if (!gitExtension?.isActive) {
         try { await gitExtension?.activate(); } catch { /* ok */ }

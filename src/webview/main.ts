@@ -112,8 +112,11 @@ function scheduleMarkdownRender(): void {
 function flushPending(): void {
   if (!S.pendingText) { S.flushScheduled = false; return; }
   if (!S.currentAgentEl) {
-    document.getElementById('turn-thinking')?.remove();
     document.getElementById('waiting')?.remove();
+    // Don't remove thinking — collapse it instead
+    if (S.thinkingStatusEl) {
+      S.thinkingStatusEl.classList.add('thinking-collapsed');
+    }
     S.currentAgentEl = appendDiv(messagesEl, 'msg agent');
   }
   S.currentAgentText += S.pendingText;
@@ -160,7 +163,7 @@ function send(): void {
     // Slash commands don't reach the LLM — don't render a user bubble.
     // The response from the adapter will be styled as a system bubble on 'done'.
     if (!isSlash) appendMessage(messagesEl, 'user', text);
-    S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.pendingText = '';
+    S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.thinkingText = ''; S.pendingText = '';
     S.pendingSlashResponse = isSlash;
     if (!isSlash) showWaiting(messagesEl);
   } else {
@@ -349,7 +352,7 @@ document.querySelectorAll<HTMLButtonElement>('.cmd-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const cmd = btn.dataset.cmd; if (!cmd) return;
     if (!S.isBusy) {
-      S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.pendingText = '';
+      S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.thinkingText = ''; S.pendingText = '';
       showWaiting(messagesEl);
     }
     vscode.postMessage({ type: 'send', text: cmd });
@@ -425,7 +428,7 @@ window.addEventListener('message', (e: MessageEvent) => {
       const newQueued = msg.queued ?? 0;
       if (msg.active && newQueued < S.prevQueueCount) {
         if (S.pendingQueuedTexts.length > 0) appendMessage(messagesEl, 'user', S.pendingQueuedTexts.shift()!);
-        S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.pendingText = '';
+        S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.thinkingText = ''; S.pendingText = '';
         showWaiting(messagesEl);
       }
       S.prevQueueCount = newQueued;
@@ -437,7 +440,14 @@ window.addEventListener('message', (e: MessageEvent) => {
       if (S.pendingText) flushPending();
       if (S.markdownDebounceTimer) { clearTimeout(S.markdownDebounceTimer); S.markdownDebounceTimer = null; }
       document.getElementById('waiting')?.remove();
-      document.getElementById('turn-thinking')?.remove();
+      // Keep thinking visible: collapse it instead of removing
+      if (S.thinkingStatusEl) {
+        const el = S.thinkingStatusEl;
+        el.classList.add('thinking-collapsed');
+        el.title = 'Click to expand';
+        el.style.cursor = 'pointer';
+        el.onclick = () => { el.classList.toggle('thinking-collapsed'); };
+      }
       if (S.currentAgentEl && S.currentAgentText) {
         // If this turn was a slash command, restyle the bubble as a centered
         // "system" message instead of a normal agent reply. The content is
@@ -469,7 +479,14 @@ window.addEventListener('message', (e: MessageEvent) => {
       if (S.pendingText) flushPending();
       if (S.markdownDebounceTimer) { clearTimeout(S.markdownDebounceTimer); S.markdownDebounceTimer = null; }
       document.getElementById('waiting')?.remove();
-      document.getElementById('turn-thinking')?.remove();
+      // Collapse thinking on error
+      if (S.thinkingStatusEl) {
+        const el = S.thinkingStatusEl;
+        el.classList.add('thinking-collapsed');
+        el.title = 'Click to expand';
+        el.style.cursor = 'pointer';
+        el.onclick = () => { el.classList.toggle('thinking-collapsed'); };
+      }
       appendMessage(messagesEl, 'error', `Error: ${msg.text}`);
       S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null;
       break;
@@ -487,7 +504,7 @@ window.addEventListener('message', (e: MessageEvent) => {
       messagesEl.innerHTML = '';
       S.pendingQueuedTexts = []; S.prevQueueCount = 0; S.knownContextSize = 0; S.flushScheduled = false;
       ctxBarWrap.style.display = 'none';
-      S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.pendingText = '';
+      S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.thinkingText = ''; S.pendingText = '';
       setBusy(false);
       statusContextEl.textContent = ''; statusContextEl.className = '';
       break;

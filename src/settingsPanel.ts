@@ -42,7 +42,7 @@ type SettingsResponse =
   | { type: 'mcpTestResult'; name: string; ok: boolean; message: string };
 
 export class SettingsPanelProvider implements vscode.WebviewViewProvider {
-  public static readonly viewId = 'hermes.settingsView';
+  public static readonly viewId = 'hermes-ai.settingsView';
 
   private view?: vscode.WebviewView;
 

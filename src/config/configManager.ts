@@ -61,7 +61,7 @@ const SECTION_MAP: Record<string, string> = {
  * 2. Fall back to "hermes" (rely on PATH)
  */
 export function getHermesPath(): string {
-  const hermesConfig = vscode.workspace.getConfiguration('hermes');
+  const hermesConfig = vscode.workspace.getConfiguration('hermes-ai');
   const inspected = hermesConfig.inspect<string>('path');
   // Try all scopes: global, workspace, then default
   const configured = inspected?.globalValue
