@@ -70,7 +70,8 @@ export interface ToWebview {
   type:
     | 'append' | 'thinking' | 'toolCall' | 'done'
     | 'error' | 'status' | 'clear' | 'busy'
-    | 'statusBar' | 'sessionList' | 'loadHistory';
+    | 'statusBar' | 'sessionList' | 'loadHistory'
+    | 'modelMenuUpdate';
   text?: string;
   toolName?: string;
   toolStatus?: string;
@@ -96,6 +97,8 @@ export interface ToWebview {
   selectedSkills?: string[];
   skillGroups?: SkillGroup[];
   contextAnnotation?: string;
+  modelGroups?: any[];
+  currentModel?: string;
 }
 
 export interface FromWebview {

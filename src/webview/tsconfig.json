@@ -1,8 +1,18 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "lib": ["ES2020", "DOM"],
-    "rootDir": ".."
+    "lib": [
+      "ES2020",
+      "DOM"
+    ],
+    "rootDir": "..",
+    "strict": true,
+    "noImplicitAny": true
   },
-  "include": ["**/*.ts", "../types.ts", "../skillCatalog.ts", "../modelCatalog.ts"]
+  "include": [
+    "**/*.ts",
+    "../types.ts",
+    "../skillCatalog.ts",
+    "../modelCatalog.ts"
+  ]
 }

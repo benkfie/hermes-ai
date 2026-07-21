@@ -170,6 +170,15 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage(msg);
   }
 
+  /**
+   * Re-read model visibility from disk and push updated model menu to webview.
+   * Called by extension.ts when settings panel saves visibility changes.
+   */
+  refreshModelMenu(currentModel: string): void {
+    const groups = this.modelGroups;
+    this.post({ type: 'modelMenuUpdate', modelGroups: groups, currentModel });
+  }
+
   private saveTurnToSession(): void {
     this.store.addTurnMessages(this.lastTurnTools, this.lastTurnText);
     this.lastTurnText = '';

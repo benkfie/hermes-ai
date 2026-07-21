@@ -197,10 +197,67 @@ statusSessionEl.addEventListener('click', (e) => {
 setupSessionPickerHandlers(sessionPicker, vscode, S, closeFn);
 
 // Model switcher
+const modelSearch = document.getElementById('model-search') as HTMLInputElement | null;
+const modelMenuItems = document.getElementById('model-menu-items') as HTMLDivElement | null;
+
 modelBtnHeader.addEventListener('click', (e) => {
   e.stopPropagation(); const open = modelMenu.style.display !== 'none';
-  closeFn(); if (!open) modelMenu.style.display = 'block';
+  closeFn(); if (!open) {
+    modelMenu.style.display = 'block';
+    if (modelSearch) {
+      modelSearch.value = '';
+      // Show all items
+      modelMenuItems?.querySelectorAll('.model-option').forEach(opt => {
+        (opt as HTMLElement).style.display = '';
+      });
+      modelMenuItems?.querySelectorAll('.model-group-label').forEach(label => {
+        (label as HTMLElement).style.display = '';
+      });
+      modelMenuItems?.querySelectorAll('.model-sep').forEach(sep => {
+        (sep as HTMLElement).style.display = '';
+      });
+      setTimeout(() => modelSearch.focus(), 50);
+    }
+  }
 });
+
+// Model search filtering
+if (modelSearch) {
+  modelSearch.addEventListener('input', () => {
+    const q = modelSearch.value.toLowerCase().trim();
+    if (!modelMenuItems) return;
+    const options = modelMenuItems.querySelectorAll('.model-option');
+    const labels = modelMenuItems.querySelectorAll('.model-group-label');
+    const seps = modelMenuItems.querySelectorAll('.model-sep');
+
+    if (!q) {
+      options.forEach(opt => (opt as HTMLElement).style.display = '');
+      labels.forEach(l => (l as HTMLElement).style.display = '');
+      seps.forEach(s => (s as HTMLElement).style.display = '');
+      return;
+    }
+
+    options.forEach(opt => {
+      const text = opt.textContent?.toLowerCase() || '';
+      (opt as HTMLElement).style.display = text.includes(q) ? '' : 'none';
+    });
+
+    // Hide group labels if all their items are hidden
+    labels.forEach(label => {
+      let next = label.nextElementSibling;
+      let hasVisible = false;
+      while (next && !next.classList.contains('model-group-label') && !next.classList.contains('model-sep')) {
+        if (next.classList.contains('model-option') && (next as HTMLElement).style.display !== 'none') {
+          hasVisible = true;
+          break;
+        }
+        next = next.nextElementSibling;
+      }
+      (label as HTMLElement).style.display = hasVisible ? '' : 'none';
+    });
+  });
+  modelSearch.addEventListener('click', (e) => e.stopPropagation());
+}
 modelMenu.addEventListener('click', (e) => {
   const opt = (e.target as HTMLElement).closest<HTMLElement>('.model-option');
   if (!opt?.dataset.command) return;
@@ -555,5 +612,42 @@ window.addEventListener('message', (e: MessageEvent) => {
     case 'loadHistory':
       loadHistory(messagesEl, msg.history ?? [], msg.switched ?? false);
       break;
+
+    case 'modelMenuUpdate': {
+      const grps = msg.modelGroups as { group: string; items: { id: string; label: string; command: string }[] }[] | undefined;
+      if (!grps || !Array.isArray(grps)) break;
+      const cur = msg.currentModel || '';
+      const mi = document.getElementById('model-menu-items');
+      if (!mi) break;
+      const esc = (s: string) => { const e = document.createElement('span'); e.textContent = s; return e.innerHTML; };
+      let h = '';
+      const cmds: string[] = [];
+      for (const g of grps) {
+        h += '<div class="model-group-label">' + esc(g.group) + '</div>';
+        for (const item of g.items) {
+          const act = (item.id === cur || item.command === cur) ? ' active' : '';
+          const sf = item.command === item.id ? '' : '<span style="opacity:0.45;font-size:0.82em"> ' + esc(item.command) + '</span>';
+          h += '<div class="model-option' + act + '" data-command="' + esc(item.command) + '">' + esc(item.label) + sf + '</div>';
+          cmds.push(item.command);
+        }
+        h += '<div class="model-sep"></div>';
+      }
+      if (!cmds.includes(cur)) {
+        h += '<div class="model-group-label">Custom</div>';
+        h += '<div class="model-option active" data-command="' + esc(cur) + '">' + esc(cur) + '</div>';
+      }
+      mi.innerHTML = DOMPurify.sanitize(h, { ADD_ATTR: ['data-command'] });
+      // Update button label
+      let found: { id: string; label: string; command: string } | undefined;
+      for (const g of grps) {
+        found = g.items.find(i => i.id === cur || i.command === cur);
+        if (found) break;
+      }
+      if (found) {
+        const btnLabel = esc(found.label);
+        modelBtnHeader.innerHTML = '<span style="opacity:0.5;font-size:0.9em;">' + String.fromCharCode(0x1F9E0) + '</span>' + btnLabel + ' ' + String.fromCharCode(0x25BE);
+      }
+      break;
+    }
   }
 });

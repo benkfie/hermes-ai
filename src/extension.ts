@@ -298,6 +298,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
+  // When visibility settings change, refresh the chat model menu
+  settingsPanel.onDidSaveVisibility(() => {
+    const { model: currentModel } = readHermesModel();
+    panel.refreshModelMenu(currentModel);
+    outputChannel.appendLine('[ui] model visibility saved -> refreshed chat model menu');
+  });
+
   // Register context menu commands (right-click -> Hermes actions)
   const sendToChat = (text: string) => {
     panel.post({ type: 'statusBar' }); // nudge

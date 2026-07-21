@@ -122,7 +122,7 @@ function readConfiguredProviders(): Set<string> {
       else if (key === 'TOGETHER_API_KEY') providers.add('together');
       else if (key === 'FIREWORKS_API_KEY') providers.add('fireworks');
       else if (key === 'PERPLEXITY_API_KEY') providers.add('perplexity');
-      else if (key === 'LM_BASE_URL') providers.add('local');
+      else if (key === 'LM_BASE_URL') providers.add('lmstudio');
     }
   } catch { /* ignore */ }
 
@@ -141,13 +141,13 @@ function readConfiguredProviders(): Set<string> {
     if (content.includes("'base_url': 'http://127.0.0.1") ||
         content.includes("'base_url': 'http://localhost") ||
         content.includes('localhost')) {
-      providers.add('local');
+      providers.add('lmstudio');
     }
   } catch { /* ignore */ }
 
   // Also check LM_BASE_URL env var
   if (process.env.LM_BASE_URL) {
-    providers.add('local');
+    providers.add('lmstudio');
   }
 
   return providers;
@@ -169,6 +169,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   perplexity: 'Perplexity',
   google: 'Gemini',
   local: 'Local',
+  lmstudio: 'LM Studio',
 };
 
 function providerLabel(providerId: string): string {
@@ -246,7 +247,7 @@ export function loadHermesModelGroups(): ModelMenuGroup[] {
     if (items.length === 0 && currentModel) {
       // Check if this model belongs to this provider
       // For local providers, always show the current model
-      if (providerId === 'local' || (providerId === 'google' && currentModel.includes('gemini'))) {
+      if (providerId === 'lmstudio' || providerId === 'local' || (providerId === 'google' && currentModel.includes('gemini'))) {
         items = [{
           id: currentModel,
           label: formatLabel(currentModel),
@@ -258,7 +259,7 @@ export function loadHermesModelGroups(): ModelMenuGroup[] {
     if (items.length > 0) {
       groups.push({
         group: providerLabel(providerId),
-        items: items.slice(0, 30),  // Show up to 30 models per provider
+        items: items,
       });
     }
   }

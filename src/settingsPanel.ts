@@ -232,15 +232,20 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
 
   /**
    * Save model visibility settings to ~/.hermes/model_visibility.json
+   * and notify listeners.
    */
   private saveModelVisibility(visibility: Record<string, boolean>): void {
     try {
       const visibilityPath = path.join(os.homedir(), '.hermes', 'model_visibility.json');
       fs.writeFileSync(visibilityPath, JSON.stringify(visibility, null, 2), 'utf8');
+      this._onDidSaveVisibility.fire();
     } catch (err) {
       this.post({ type: 'error', message: `Failed to save model visibility: ${err}` });
     }
   }
+
+  private _onDidSaveVisibility = new vscode.EventEmitter<void>();
+  public readonly onDidSaveVisibility = this._onDidSaveVisibility.event;
 
   /**
    * Build the self-contained HTML for the settings webview.
