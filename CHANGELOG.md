@@ -6,6 +6,36 @@ The `v1.x` and `v2.x` majors were premature — milestones in the author's head,
 
 ---
 
+## [1.0.3] — 2026-07-21
+
+### Fixed
+- **Busy indicator**: The Send button no longer reappears while the agent is still
+  streaming. `setBusy(false)` now fires from the webview `done` handler, not from
+  `runPrompt.finally`, eliminating the race condition where `session/prompt`
+  resolved before streaming was complete.
+- **Thinking display**: Thinking text now properly accumulates across chunks
+  instead of replacing with each small fragment. Rendered in a scrollable block.
+- **Model accuracy**: Model selector now optimistically updates when switching
+  models (immediate UI feedback). Session info updates from ACP now propagate
+  the `model` field.
+
+### Added
+- **Terminal visibility**: Execute/bash tool calls now render as full terminal
+  blocks showing the command (in a styled header) and streaming output (in a
+  scrollable `<pre>` block). Output updates in real-time as the agent runs
+  commands.
+- **Diff preview**: File edits by the agent now show a VS Code side-by-side
+  diff on completion. File contents are snapshotted before the edit and compared
+  after, then the `showDiff` integration prompts to accept or reject changes.
+
+### Changed
+- `parseToolCallUpdate` now extracts `toolOutput` from `rawOutput`, `output`,
+  or content blocks for terminal display.
+- `chatPanel` forwards `toolOutput` in both `tool_call` and `tool_call_update`
+  webview messages.
+- Webview CSS: added `.msg.terminal` block styling with header + body layout.
+
+
 ## [3.0.0] — 2026-04-06
 
 Release candidate. Ships the full v3.0.0 architecture plus a major slash-command surface expansion, session-persistence and context-loading fixes, and a redesigned composer layout — all validated against live Hermes usage.
