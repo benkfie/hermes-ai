@@ -126,7 +126,8 @@ ${CSS_TEMPLATE}
         <span style="opacity:0.5;font-size:0.9em;">🧠</span>${escapeHtml(modelLabel)} ▾
       </button>
       <div id="model-menu" style="display:none">
-        ${modelMenuHtml}
+        <input type="text" id="model-search" placeholder="Search models..." style="width:100%;padding:6px 8px;border:none;border-bottom:1px solid var(--vscode-dropdown-border, #3c3c3c);background:var(--vscode-input-background);color:var(--vscode-input-foreground);font-size:0.82em;font-family:var(--ui-font);outline:none;box-sizing:border-box;">
+        <div id="model-menu-items">${modelMenuHtml}</div>
       </div>
     </div>
     <button class="cmd-btn" id="attach-btn" title="Attach file"><span class="btn-icon">📎</span></button>

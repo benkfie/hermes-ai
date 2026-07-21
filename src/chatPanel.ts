@@ -24,7 +24,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
   private lastTurnTools: StoredMessage[] = [];
 
   private readonly store: SessionStore;
-  private readonly modelGroups: ModelMenuGroup[] = loadHermesModelGroups();
+  private get modelGroups(): ModelMenuGroup[] { return loadHermesModelGroups(); }
   private readonly skillGroups: SkillGroup[] = loadHermesSkills();
 
   private selectedSkills: string[] = [];

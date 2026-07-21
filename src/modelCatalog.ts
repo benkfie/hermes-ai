@@ -187,10 +187,21 @@ function formatLabel(modelId: string, record?: { id: string; name?: string }): s
 
 // ── Build the model menu ───────────────────────────
 
+function readModelVisibility(): Record<string, boolean> {
+  const visPath = path.join(os.homedir(), '.hermes', 'model_visibility.json');
+  try {
+    if (fs.existsSync(visPath)) {
+      return JSON.parse(fs.readFileSync(visPath, 'utf8'));
+    }
+  } catch { /* ignore */ }
+  return {};
+}
+
 export function loadHermesModelGroups(): ModelMenuGroup[] {
   const currentModel = readCurrentModel();
   const cache = readModelCache();
   const configuredProviders = readConfiguredProviders();
+  const visibility = readModelVisibility();
   const groups: ModelMenuGroup[] = [];
 
   // 1. Current model group
@@ -215,6 +226,10 @@ export function loadHermesModelGroups(): ModelMenuGroup[] {
     if (models && Object.keys(models).length > 0) {
       // Sort alphabetically by name
       items = Object.entries(models)
+        .filter(([id]) => {
+          const key = providerId + '::' + id;
+          return visibility[key] !== false;  // show unless explicitly hidden
+        })
         .sort(([, a], [, b]) => {
           const aName = (a.name || '').toLowerCase();
           const bName = (b.name || '').toLowerCase();

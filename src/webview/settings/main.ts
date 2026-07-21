@@ -234,6 +234,26 @@ document.getElementById('browse-hermes')?.addEventListener('click', () => {
   post({ type: 'setConfig', key: 'path', value: 'prompt-browse' });
 });
 
+// --- Model visibility search --------------------------------
+const modelVisSearch = document.getElementById('model-vis-search') as HTMLInputElement;
+if (modelVisSearch) {
+  modelVisSearch.addEventListener('input', () => {
+    const q = modelVisSearch.value.toLowerCase();
+    const container = document.getElementById('model-catalog');
+    if (!container) return;
+    container.querySelectorAll('.model-list label').forEach(label => {
+      const text = label.textContent?.toLowerCase() || '';
+      (label as HTMLElement).style.display = text.includes(q) ? '' : 'none';
+    });
+    container.querySelectorAll('.provider-section').forEach(section => {
+      const hasVisible = section.querySelector('.model-list label:not([style*="display: none"])');
+      const header = section.querySelector('.provider-header');
+      const list = section.querySelector('.model-list');
+      (section as HTMLElement).style.display = hasVisible ? '' : 'none';
+    });
+  });
+}
+
 // --- Init -------------------------------------------------
 post({ type: 'ready' });
 post({ type: 'getConfig' });
