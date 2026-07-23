@@ -98,7 +98,14 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
         this.post({ type: 'thinking', text: event.thinkingText });
       }
       if (event.toolTitle !== undefined) {
-        if (event.toolTitle === '' && event.toolCallId) {
+              // Check for streaming terminal chunks (toolOutput type from sessionManager)
+              if ((event as any).type === 'toolOutput' && event.toolCallId) {
+                this.post({
+                  type: 'toolOutput',
+                  toolCallId: event.toolCallId,
+                  text: (event as any).toolOutput || '',
+                });
+              } else if (event.toolTitle === '' && event.toolCallId) {
           // tool_call_update — status change + output for existing tool
           this.post({
             type: 'toolCall',

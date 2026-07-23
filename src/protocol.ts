@@ -88,7 +88,31 @@ export function parseToolCall(update: RawUpdate): ParsedToolCall {
     }
   }
 
-  return { title, status, toolCallId, kind, locations, detail, todoState };
+  // Extract terminal output from content blocks (streaming tool.stdout/tool.stderr chunks)
+  let toolOutput: string | undefined;
+  const rawOut = update.rawOutput ?? (update as RawUpdate).raw_output;
+  if (typeof rawOut === 'string' && rawOut.trim()) {
+    toolOutput = rawOut;
+  } else if (typeof update.output === 'string' && update.output.trim()) {
+    toolOutput = update.output;
+  } else {
+    const blocks = update.content as any[];
+    if (Array.isArray(blocks)) {
+      const texts: string[] = [];
+      for (const b of blocks) {
+        if (!b) continue;
+        const txt = b.text || b.content?.text;
+        if (typeof txt === 'string' && txt.trim()) {
+          texts.push(txt);
+        }
+      }
+      if (texts.length > 0) {
+        toolOutput = texts.join('\n');
+      }
+    }
+  }
+
+  return { title, status, toolCallId, kind, locations, detail, todoState, toolOutput };
 }
 
 // ── Tool call update parsing ─────────────────────────
