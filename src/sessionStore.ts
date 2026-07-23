@@ -204,11 +204,11 @@ export class SessionStore {
 /**
  * Parse `hermes sessions list` output into HermesCliSession[].
  *
- * Output format:
- *   Title                    Preview                    Last Active   ID
- *   ────────────────────────────────────────────────────────────────
- *   My Session               Hi Hermes...              just now      abc123...
- *   —                        ...                       1h ago        def456...
+ * Output format (4 columns):
+ *   Title                        Workspace          Last Active   ID
+ *   ─────────────────────────────────────────────────────────────
+ *   ACP Terminal Streaming Pla   Hermes_Extension   just now      abc123...
+ *   —                            —                  1h ago        def456...
  */
 function parseSessionList(output: string): HermesCliSession[] {
   const sessions: HermesCliSession[] = [];
@@ -228,7 +228,7 @@ function parseSessionList(output: string): HermesCliSession[] {
     }
     if (trimmed.startsWith('─') || trimmed.startsWith('┌') || trimmed.startsWith('└') || trimmed.startsWith('│')) continue;
 
-    // Parse session line: "Title    Preview    Last Active    ID"
+    // Parse session line: "Title    Workspace    Last Active    ID"
     // The ID is always the last column. Format: UUID or timestamp-based ID
     const idMatch = trimmed.match(/\s+([\w-]{8,}(?:[\w-]{4,})*)$/);
     if (!idMatch) continue;
@@ -236,39 +236,40 @@ function parseSessionList(output: string): HermesCliSession[] {
     const id = idMatch[1];
     const beforeId = trimmed.substring(0, trimmed.length - idMatch[0].length).trim();
 
-    // Split remaining into title + preview + lastActive
+    // Split remaining into title + workspace + lastActive
     // Last active patterns: "just now", "5m ago", "1h ago", "2026-07-13", "yesterday"
     const lastActiveMatch = beforeId.match(/\s+(just now|\d+[mhd] ago|yesterday|\d{4}-\d{2}-\d{2}|\d{1,2}h ago)$/);
-    let titleAndPreview = beforeId;
+    let titleAndWorkspace = beforeId;
     let lastActive = '';
     if (lastActiveMatch) {
       lastActive = lastActiveMatch[1];
-      titleAndPreview = beforeId.substring(0, beforeId.length - lastActiveMatch[0].length).trim();
+      titleAndWorkspace = beforeId.substring(0, beforeId.length - lastActiveMatch[0].length).trim();
     }
 
-    // Title is the first 20-30 chars, preview is the rest
-    // The table format: "Title (30) Preview (40) Last Active (12) ID (40)"
+    // Split title and workspace - workspace is the second column
+    // The CLI uses fixed-width columns: Title (~27 chars), Workspace (~18 chars)
+    // Split on multiple spaces to find the boundary
     let title = '';
-    let preview = '';
-
-    if (titleAndPreview.length > 38) {
-      // If it's long enough, split at ~30 chars for title
-      title = titleAndPreview.substring(0, 30).trim();
-      preview = titleAndPreview.substring(30).trim();
+    let workspace = '';
+    
+    // Try to split on 2+ consecutive spaces (column boundary)
+    const parts = titleAndWorkspace.split(/\s{2,}/);
+    if (parts.length >= 2) {
+      title = parts[0].trim();
+      workspace = parts.slice(1).join(' ').trim();
     } else {
-      title = titleAndPreview;
+      title = titleAndWorkspace;
     }
 
-    // Clean up title
+    // Clean up em dash placeholders
     if (title === '—' || title === '') {
-      title = preview.substring(0, 40) || 'untitled';
-      preview = preview.length > 40 ? preview.substring(40) : '';
+      title = 'untitled';
     }
 
     sessions.push({
       id,
       title: title || 'untitled',
-      preview: preview || '',
+      preview: workspace || '',
       lastActive,
     });
   }
