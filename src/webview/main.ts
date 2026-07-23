@@ -164,8 +164,9 @@ function send(): void {
     // The response from the adapter will be styled as a system bubble on 'done'.
     if (!isSlash) appendMessage(messagesEl, 'user', text);
     S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.thinkingText = ''; S.pendingText = '';
-    S.terminalBlocks.clear();
-      S.toolCommandMap.clear();
+      S.terminalBlocks.clear();
+    S.toolCommandMap.clear();
+    S.terminalChunks.clear();
     S.pendingSlashResponse = isSlash;
     if (!isSlash) showWaiting(messagesEl);
   } else {
@@ -454,6 +455,24 @@ window.addEventListener('message', (e: MessageEvent) => {
       autoScroll();
       break;
 
+    case 'toolOutput': {
+      // Live streaming chunk for a terminal/execute tool
+      const toolId = msg.toolCallId;
+      const chunk = msg.text ?? '';
+      if (!toolId || !chunk) break;
+
+      const cmd = S.toolCommandMap.get(toolId);
+      if (!cmd) break;
+
+      // Accumulate chunks
+      const prev = S.terminalChunks.get(toolId) || '';
+      S.terminalChunks.set(toolId, prev + chunk);
+
+      renderTerminalBlock(messagesEl, toolId, cmd, chunk, false, true);
+      autoScroll();
+      break;
+    }
+
     case 'toolCall': {
       // tool_call_update — update existing tool
       if (!msg.toolName && msg.toolCallId) {
@@ -620,6 +639,7 @@ window.addEventListener('message', (e: MessageEvent) => {
       S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null; S.thinkingText = ''; S.pendingText = '';
       S.terminalBlocks.clear();
       S.toolCommandMap.clear();
+      S.terminalChunks.clear();
       setBusy(false);
       statusContextEl.textContent = ''; statusContextEl.className = '';
       break;

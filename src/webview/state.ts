@@ -33,6 +33,9 @@ export interface WebviewState {
   // Terminal tracking for tool calls
   terminalBlocks: Map<string, HTMLElement>;
   toolCommandMap: Map<string, string>;
+
+  /** Accumulates streaming terminal chunks keyed by toolCallId */
+  terminalChunks: Map<string, string>;
 }
 
 export function createInitialState(): WebviewState {
@@ -55,5 +58,6 @@ export function createInitialState(): WebviewState {
     skillGroupsData: [],
     terminalBlocks: new Map(),
     toolCommandMap: new Map(),
+    terminalChunks: new Map(),
   };
 }

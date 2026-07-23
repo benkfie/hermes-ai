@@ -69,7 +69,7 @@ export type SessionUpdateHandler = (event: SessionUpdateEvent) => void;
 
 export interface ToWebview {
   type:
-    | 'append' | 'thinking' | 'toolCall' | 'done'
+    | 'append' | 'thinking' | 'toolCall' | 'toolOutput' | 'done'
     | 'error' | 'status' | 'clear' | 'busy'
     | 'statusBar' | 'sessionList' | 'loadHistory'
     | 'modelMenuUpdate';

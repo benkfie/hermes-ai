@@ -255,6 +255,10 @@ export class SessionManager {
           event.todoState = parsed.todoState;
           this.log(`[session] todo tool_call: ${parsed.todoState.todos.length} items`);
         }
+        // If this is a streaming terminal chunk (status='in_progress'), forward as toolOutput
+        if (parsed.status === 'in_progress' && parsed.toolOutput) {
+          (event as any).type = 'toolOutput';
+        }
         break;
       }
 

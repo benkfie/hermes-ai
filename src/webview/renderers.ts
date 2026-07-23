@@ -85,8 +85,9 @@ export function renderTerminalBlock(
   container: HTMLElement,
   toolId: string,
   command: string,
-  outputBlock: string,
+  outputChunk: string,
   isDone: boolean,
+  append: boolean = false,
 ): HTMLElement {
   let block = container.querySelector(`[data-term-id="${toolId}"]`);
   if (!block) {
@@ -102,8 +103,12 @@ export function renderTerminalBlock(
   }
 
   const body = block.querySelector('.term-body') as HTMLElement;
-  if (body && outputBlock) {
-    body.textContent = outputBlock;
+  if (body && outputChunk) {
+    if (append) {
+      body.textContent = (body.textContent || '') + outputChunk;
+    } else {
+      body.textContent = outputChunk;
+    }
   }
 
   if (isDone) {

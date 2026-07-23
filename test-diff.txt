@@ -1,1 +1,8 @@
 Original file content
+
+
+---
+
+*This is edited content!*
+*If you see this, the side-by-side diff window has opened in your IDE.*
+*Please click "Accept Changes" or "Reject" and let me know if it prompts you for feedback!*
