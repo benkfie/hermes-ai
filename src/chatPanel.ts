@@ -333,26 +333,41 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
       this.broadcastSessions(this.store);
 
     } else if (msg.type === 'switchSession' && msg.sessionId) {
-      this.log(`[ui] switch session ${msg.sessionId}`);
-      const target = this.store.switchTo(msg.sessionId);
-      if (!target) return;
+          this.log(`[ui] switch session ${msg.sessionId}`);
+          const target = this.store.switchTo(msg.sessionId);
+          if (!target) return;
 
-      this.messageQueue = [];
-      this.lastTurnText = '';
-      this.lastTurnTools = [];
-      this.session.reset();
-      if (target.acpSessionId) {
-        this.session.setStoredSessionId(target.acpSessionId);
-        this.log(`[session] will attempt resume of ACP session ${target.acpSessionId}`);
-      }
+          this.messageQueue = [];
+          this.lastTurnText = '';
+          this.lastTurnTools = [];
+          this.session.reset();
+          if (target.acpSessionId) {
+            this.session.setStoredSessionId(target.acpSessionId);
+            this.log(`[session] will attempt resume of ACP session ${target.acpSessionId}`);
+          }
 
-      this.post({ type: 'clear' });
-      this.post({ type: 'statusBar', sessionTitle: target.title });
-      this.broadcastSessions(this.store);
+          this.post({ type: 'clear' });
+          this.post({ type: 'statusBar', sessionTitle: target.title });
+          this.broadcastSessions(this.store);
 
-      if (target.messages.length > 0) {
-        this.post({ type: 'loadHistory', history: target.messages, activeSessionId: target.id });
-      }
+          if (target.messages.length > 0) {
+            this.post({ type: 'loadHistory', history: target.messages, activeSessionId: target.id });
+          } else if (target.acpSessionId) {
+            // Load history from ACP server — replay will stream to webview via onUpdate
+            this.log(`[session] switch: loading ACP session history ${target.acpSessionId}`);
+            const cwd = this.resolveWorkingDirectory();
+            try {
+              const loaded = await this.session.loadSessionHistory(target.acpSessionId, cwd);
+              if (loaded) {
+                this.store.setAcpSessionId(target.acpSessionId);
+                this.log(`[session] switch: resumed ${target.acpSessionId}`);
+              } else {
+                this.log(`[session] switch: ACP session ${target.acpSessionId} not found, showing blank`);
+              }
+            } catch (err) {
+              this.log(`[session] switch: failed to load ACP session history: ${err}`);
+            }
+          }
 
     } else if (msg.type === 'attachFile') {
       // Open file picker and send selected file info back to webview

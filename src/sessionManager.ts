@@ -78,12 +78,39 @@ export class SessionManager {
   }
 
   /** Set a stored ACP session ID for resume attempts. */
-  setStoredSessionId(id: string | undefined): void {
-    this.storedSessionId = id ?? null;
-  }
-  private storedSessionId: string | null = null;
+    setStoredSessionId(id: string | undefined): void {
+      this.storedSessionId = id ?? null;
+    }
+    private storedSessionId: string | null = null;
 
-  /** Returns the current ACP session ID (for persistence by the caller). */
+    /**
+     * Load an existing ACP session's history without creating a new session.
+     * History replay notifications arrive via the normal onUpdate callback.
+     * Returns true if the session was found and loaded.
+     */
+    async loadSessionHistory(sessionId: string, cwd: string): Promise<boolean> {
+      try {
+        this.log(`[session] loadSessionHistory: loading ${sessionId}`);
+        const result = await this.client.call('session/load', {
+          sessionId,
+          cwd,
+          mcpServers: [],
+        });
+        if (result !== null && result !== undefined) {
+          this.sessionId = sessionId;
+          this.storedSessionId = null; // consumed
+          this.log(`[session] loadSessionHistory: resumed ${sessionId}`);
+          return true;
+        }
+        this.log(`[session] loadSessionHistory: ${sessionId} not found`);
+        return false;
+      } catch (err) {
+        this.log(`[session] loadSessionHistory: failed (${err})`);
+        return false;
+      }
+    }
+
+    /** Returns the current ACP session ID (for persistence by the caller). */
   getSessionId(): string | null {
     return this.sessionId;
   }
