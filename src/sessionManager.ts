@@ -280,14 +280,15 @@ export class SessionManager {
         if (parsed.detail) event.toolDetail = parsed.detail;
         if (parsed.toolOutput) (event as any).toolOutput = parsed.toolOutput;
         if (parsed.todoState) {
-          event.todoState = parsed.todoState;
-          this.log(`[session] todo tool_call: ${parsed.todoState.todos.length} items`);
-        }
-        // If this is a streaming terminal chunk (status='in_progress'), forward as toolOutput
-        if (parsed.status === 'in_progress' && parsed.toolOutput) {
-          (event as any).type = 'toolOutput';
-        }
-        break;
+                  event.todoState = parsed.todoState;
+                  this.log(`[session] todo tool_call: ${parsed.todoState.todos.length} items`);
+                }
+                // NOTE: Intentionally NOT setting event.type = 'toolOutput' here.
+                // The initial tool_call must always flow through the toolCall path
+                // in chatPanel.ts so the webview creates the terminal block and
+                // populates toolCommandMap. Streaming chunks arrive via separate
+                // tool_call_update notifications, which DO set type='toolOutput'.
+                break;
       }
 
       case 'tool_call_update': {

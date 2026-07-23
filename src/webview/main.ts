@@ -461,8 +461,14 @@ window.addEventListener('message', (e: MessageEvent) => {
       const chunk = msg.text ?? '';
       if (!toolId || !chunk) break;
 
-      const cmd = S.toolCommandMap.get(toolId);
-      if (!cmd) break;
+      let cmd = S.toolCommandMap.get(toolId);
+      if (!cmd) {
+        // If toolCall hasn't arrived yet, use a placeholder so the block
+        // is created and can receive streaming chunks. The real command
+        // will be set when toolCall arrives.
+        cmd = 'pending...';
+        S.toolCommandMap.set(toolId, cmd);
+      }
 
       // Accumulate chunks
       const prev = S.terminalChunks.get(toolId) || '';

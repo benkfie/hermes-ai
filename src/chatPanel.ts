@@ -112,6 +112,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
             type: 'toolCall',
             toolCallId: event.toolCallId,
             toolStatus: event.toolStatus,
+            toolKind: (event as any).toolKind,
             toolOutput: (event as any).toolOutput,
           });
 
