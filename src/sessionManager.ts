@@ -234,14 +234,15 @@ export class SessionManager {
   }
 
   private handleUpdate(params: Record<string, unknown>): void {
-    if (!this.updateHandler) return;
+      if (!this.updateHandler) return;
 
-    const session_id = params.sessionId as string;
-    const update = params.update as Record<string, unknown> | undefined;
-    if (!update) return;
+      const session_id = params.sessionId as string;
+      const update = params.update as Record<string, unknown> | undefined;
+      if (!update) return;
 
-    const kind = update.sessionUpdate as string;
-    const event: SessionUpdateEvent = { session_id };
+      const kind = update.sessionUpdate as string;
+      console.log('[SessionManager] handleUpdate kind:', kind, 'update keys:', Object.keys(update || {}).join(','));
+      const event: SessionUpdateEvent = { session_id };
 
     switch (kind) {
       case 'agent_message_chunk': {
