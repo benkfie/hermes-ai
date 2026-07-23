@@ -300,6 +300,10 @@ export class SessionManager {
           event.todoState = parsed.todoState;
           this.log(`[session] todo update: ${parsed.todoState.todos.length} items`);
         }
+        // Streaming terminal chunks come as tool_call_update with status='in_progress'
+        if (parsed.status === 'in_progress' && parsed.toolOutput) {
+          (event as any).type = 'toolOutput';
+        }
         break;
       }
 
