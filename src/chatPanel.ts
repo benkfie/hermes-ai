@@ -79,7 +79,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
     // Emit initial state
     setTimeout(() => {
       this.post({ type: 'statusBar', model: this.initialModel, version: this.hermesVersion, skillGroups: this.skillGroups });
-      this.broadcastSessions(this.store);
+      this.broadcastSessions();
       // Restore last session's history into the view
       if (active && active.messages.length > 0) {
         this.post({ type: 'loadHistory', history: active.messages, activeSessionId: this.store.activeId });
@@ -122,7 +122,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
         if (activeId) {
           this.store.rename(activeId, event.sessionTitle);
           this.post({ type: 'statusBar', sessionTitle: event.sessionTitle });
-          this.broadcastSessions(this.store);
+          this.broadcastSessions();
           this.log(`[session] title synced from ACP: ${event.sessionTitle}`);
         }
       }
@@ -304,7 +304,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
         }
       }
       this.replayBuffer = [];
-      this.broadcastSessions(this.store);
+      this.broadcastSessions();
     }
 
   /** Get the stored ACP session ID for auto-resume after connection. */
@@ -357,7 +357,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
         const newTitle = this.store.autoTitle(msg.text);
         if (newTitle) {
           this.post({ type: 'statusBar', sessionTitle: newTitle });
-          this.broadcastSessions(this.store);
+          this.broadcastSessions();
         }
         this.store.addUserMessage(msg.text);
       } else {
@@ -370,7 +370,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
           if (activeId && newTitle) {
             this.store.rename(activeId, newTitle);
             this.post({ type: 'statusBar', sessionTitle: newTitle.slice(0, 60) });
-            this.broadcastSessions(this.store);
+            this.broadcastSessions();
             this.log(`[ui] /title synced locally: ${newTitle}`);
           }
         }
@@ -427,7 +427,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
       this.session.reset();
       this.store.createSession('new session');
       this.post({ type: 'clear' });
-      this.broadcastSessions(this.store);
+      this.broadcastSessions();
 
     } else if (msg.type === 'switchSession' && msg.sessionId) {
               this.log(`[ui] switch session ${msg.sessionId}`);
@@ -446,7 +446,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
 
               this.post({ type: 'clear' });
               this.post({ type: 'statusBar', sessionTitle: target.title });
-              this.broadcastSessions(this.store);
+              this.broadcastSessions();
 
               // Always load from server for ACP sessions - server is source of truth
               if (target.acpSessionId) {
@@ -517,7 +517,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
           });
           if (newName !== undefined && newName.trim()) {
             this.store.rename(msg.sessionId, newName.trim());
-            this.broadcastSessions(this.store);
+            this.broadcastSessions();
             if (msg.sessionId === this.store.activeId) {
               this.post({ type: 'statusBar', sessionTitle: newName.trim().slice(0, 60) });
               void this.runPrompt(`/title ${newName.trim().slice(0, 60)}`);
@@ -526,7 +526,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
 
     } else if (msg.type === 'deleteSession' && msg.sessionId) {
       if (this.store.deleteSession(msg.sessionId)) {
-        this.broadcastSessions(this.store);
+        this.broadcastSessions();
       }
 
     } else if (msg.type === 'toggleSkill' && msg.text) {
@@ -700,14 +700,16 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
   }
 
 
-  private broadcastSessions(_store: SessionStore): void {
-    this.post({
-      type: 'sessionList',
-      sessions: _store.allSessionsReversed(),
-      activeSessionId: _store.activeId,
-      sessionTitle: _store.active()?.title,
-    });
-  }
+  /** Broadcast session list to webview (async, uses ACP sync). */
+    private async broadcastSessions(): Promise<void> {
+      const sessions = await this.store.allSessions();
+      this.post({
+        type: 'sessionList',
+        sessions: sessions.reverse(),
+        activeSessionId: this.store.activeId,
+        sessionTitle: this.store.active()?.title,
+      });
+    }
 
 
   private buildHtml(webview: vscode.Webview): string {

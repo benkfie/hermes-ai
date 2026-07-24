@@ -20,17 +20,21 @@ export class SessionStore {
   private acpClient: AcpClient | null = null;
 
   constructor(
-    private readonly context: vscode.ExtensionContext,
-    private readonly getCwd: () => string = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd()
-  ) {
-    const saved = context.workspaceState.get<ChatSession[]>(SESSIONS_KEY);
-    if (saved && saved.length > 0) {
-      this.sessions = saved.map(s => ({ ...s, messages: s.messages ?? [], lastActive: s.lastActive ?? 0 }));
-      // Find the most recently active session
-      this.activeSessionId = this.sessions
-        .sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0))[0]?.id ?? '';
+      private readonly context: vscode.ExtensionContext,
+      private readonly getCwd: () => string = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd()
+    ) {
+      const saved = context.workspaceState.get<ChatSession[]>(SESSIONS_KEY);
+      if (saved && saved.length > 0) {
+        // Filter out sessions with non-ACP acpSessionId (old TUI sessions that got mixed in)
+        // Only keep sessions with no acpSessionId (pure local) or valid ACP IDs (acp-...)
+        this.sessions = saved
+          .map(s => ({ ...s, messages: s.messages ?? [], lastActive: s.lastActive ?? 0 }))
+          .filter(s => !s.acpSessionId || s.acpSessionId.startsWith('acp-'));
+        // Find the most recently active session
+        this.activeSessionId = this.sessions
+          .sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0))[0]?.id ?? '';
+      }
     }
-  }
 
   setAcpClient(client: AcpClient): void {
     this.acpClient = client;
@@ -107,18 +111,20 @@ export class SessionStore {
   }
 
   switchTo(sessionId: string): ChatSession | undefined {
-    // Check extension sessions first
-    let target = this.sessions.find(s => s.id === sessionId);
-    if (!target && this.acpClient) {
-      // Might be an ACP session - create extension wrapper
-      // This will be handled async in chatPanel via allSessions()
-      target = this.sessions.find(s => s.acpSessionId === sessionId);
+      // Check extension sessions first
+      let target = this.sessions.find(s => s.id === sessionId);
+      if (!target) {
+        // Only try to find by acpSessionId if it's a valid ACP ID
+        if (sessionId.startsWith('acp-')) {
+          target = this.sessions.find(s => s.acpSessionId === sessionId);
+        }
+      }
+      if (!target || target.id === this.activeSessionId) return undefined;
+      this.activeSessionId = target.id;
+      target.lastActive = Date.now();
+      this.persist();
+      return target;
     }
-    if (!target || target.id === this.activeSessionId) return undefined;
-    this.activeSessionId = sessionId;
-    this.persist();
-    return target;
-  }
 
   deleteSession(sessionId: string): boolean {
     if (sessionId === this.activeSessionId) return false;
