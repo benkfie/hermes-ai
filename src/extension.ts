@@ -398,6 +398,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         session.setStoredSessionId(storedAcpId);
         // Attempt to load the session history from the ACP server.
         // This will stream history via onUpdate → ChatPanel → webview.
+        panel.startReplayCapture();
         try {
           const loaded = await session.loadSessionHistory(storedAcpId, cwd);
           if (loaded) {

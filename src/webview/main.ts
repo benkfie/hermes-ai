@@ -444,6 +444,11 @@ window.addEventListener('message', (e: MessageEvent) => {
       scheduleFlush();
       break;
 
+    case 'userMessage':
+      appendMessage(messagesEl, 'user', msg.text ?? '');
+      autoScroll();
+      break;
+
     case 'thinking':
       if (!S.thinkingStatusEl) {
         document.getElementById('waiting')?.remove();

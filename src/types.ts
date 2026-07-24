@@ -72,7 +72,7 @@ export interface ToWebview {
     | 'append' | 'thinking' | 'toolCall' | 'toolOutput' | 'done'
     | 'error' | 'status' | 'clear' | 'busy'
     | 'statusBar' | 'sessionList' | 'loadHistory'
-    | 'modelMenuUpdate';
+    | 'modelMenuUpdate' | 'userMessage';
   text?: string;
   toolName?: string;
   toolStatus?: string;

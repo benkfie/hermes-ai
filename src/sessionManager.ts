@@ -260,6 +260,17 @@ export class SessionManager {
       const event: SessionUpdateEvent = { session_id };
 
     switch (kind) {
+      case 'user_message_chunk': {
+        if (this.cancelled) return;
+        const text = extractTextContent(update);
+        if (text === null) return;
+        const result = deduplicateChunk(text, this.accumulated);
+        if (result.action === 'drop') return;
+        this.accumulated = result.newAccumulated;
+        (event as any).userText = result.text;
+        break;
+      }
+
       case 'agent_message_chunk': {
         if (this.cancelled) return;
         const text = extractTextContent(update);

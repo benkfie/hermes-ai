@@ -145,6 +145,10 @@ export class SessionStore {
     const s = this.active();
     if (!s) return null;
     if (s.messages.some(m => m.role === 'user')) return null;
+    // Don't overwrite a meaningful title (e.g. one synced from the ACP server).
+    // Only auto-title when the session is still on its default placeholder.
+    const DEFAULT_TITLES = new Set(['new session', 'untitled', '']);
+    if (!DEFAULT_TITLES.has(s.title)) return s.title;
     s.title = text.slice(0, 38).replace(/\s+/g, ' ').trim();
     if (text.length > 38) s.title = s.title.slice(0, 35) + '\u2026';
     this.persist();
@@ -195,6 +199,11 @@ export class SessionStore {
   }
 
   // ── Persistence ────────────────────────────────────
+
+  /** Persist the currently active session (used after replay sync). */
+  persistActive(): void {
+    this.persist();
+  }
 
   private persist(): void {
     void this.context.workspaceState.update(SESSIONS_KEY, this.sessions);

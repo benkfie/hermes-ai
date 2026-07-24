@@ -23,6 +23,10 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
   private messageQueue: string[] = [];
   private lastTurnText = '';
   private lastTurnTools: StoredMessage[] = [];
+  /** Set while an ACP session/load history replay is streaming. */
+  private replayingHistory = false;
+  private replayBuffer: StoredMessage[] = [];
+  private replayTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly store: SessionStore;
   private get modelGroups(): ModelMenuGroup[] { return loadHermesModelGroups(); }
@@ -94,11 +98,41 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
         const converted = this.convertMediaPaths(event.text, webviewView.webview);
         this.lastTurnText += event.text;
         this.post({ type: 'append', text: converted });
+        if (this.replayingHistory) {
+          this.replayBuffer.push({ role: 'agent', text: event.text });
+        }
+      }
+
+      if ((event as any).userText) {
+        const userText = (event as any).userText as string;
+        this.post({ type: 'userMessage', text: userText });
+        if (this.replayingHistory) {
+          this.replayBuffer.push({ role: 'user', text: userText });
+        }
       }
       if (event.thinkingText) {
         this.post({ type: 'thinking', text: event.thinkingText });
       }
+      // Persist AI-generated session title from ACP session_info_update.
+      // The ACP adapter auto-titles sessions (maybe_auto_title) and emits the
+      // proper title; we must store it so the session picker shows the real
+      // title instead of the raw first-message text or "untitled".
+      if (event.sessionTitle) {
+        const activeId = this.store.activeId;
+        if (activeId) {
+          this.store.rename(activeId, event.sessionTitle);
+          this.post({ type: 'statusBar', sessionTitle: event.sessionTitle });
+          this.broadcastSessions(this.store);
+          this.log(`[session] title synced from ACP: ${event.sessionTitle}`);
+        }
+      }
+
       if (event.toolTitle !== undefined) {
+        // Buffer tool events during history replay
+        if (this.replayingHistory && event.toolTitle) {
+          const detail = event.toolDetail ? `: ${event.toolDetail}` : '';
+          this.replayBuffer.push({ role: 'tool', text: `${event.toolTitle}${detail}` });
+        }
         // Check for streaming terminal chunks (toolOutput type from sessionManager)
         if ((event as any).type === 'toolOutput' && event.toolCallId) {
           this.post({
@@ -192,6 +226,11 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
         this.post({ type: 'statusBar', todoState: event.todoState });
       }
       if (event.done) {
+        // End any in-progress history replay capture
+        if (this.replayingHistory) {
+          // Give a tick for trailing chunks, then flush
+          setTimeout(() => this.finishReplayCapture(), 50);
+        }
         // Detect model-switch response and update status bar
         const modelMatch = /model (?:switched|changed) to:\s*([\w\-\.]+)/i.exec(this.lastTurnText);
         if (modelMatch) {
@@ -225,6 +264,37 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
 
   post(msg: ToWebview): void {
     this.view?.webview.postMessage(msg);
+  }
+
+  /**
+   * Begin capturing streamed session/load history replay into replayBuffer.
+   * While active, user/agent/tool messages arriving via onUpdate are buffered
+   * and persisted to the session store at the end of the replay so the local
+   * history stays in sync with the ACP server (bidirectional sync).
+   */
+  startReplayCapture(): void {
+    this.replayingHistory = true;
+    this.replayBuffer = [];
+    if (this.replayTimer) clearTimeout(this.replayTimer);
+    // Safety: if no 'done' arrives, flush after 4s of inactivity.
+    this.replayTimer = setTimeout(() => this.finishReplayCapture(), 4000);
+  }
+
+  private finishReplayCapture(): void {
+    if (!this.replayingHistory) return;
+    this.replayingHistory = false;
+    if (this.replayTimer) { clearTimeout(this.replayTimer); this.replayTimer = null; }
+    if (this.replayBuffer.length > 0) {
+      const s = this.store.active();
+      if (s) {
+        // Replace local messages with the synced replay (server is source of truth)
+        s.messages = [...this.replayBuffer];
+        this.store.persistActive();
+        this.log(`[session] replay captured ${this.replayBuffer.length} messages into store`);
+      }
+    }
+    this.replayBuffer = [];
+    this.broadcastSessions(this.store);
   }
 
   /** Get the stored ACP session ID for auto-resume after connection. */
@@ -364,6 +434,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
             this.log(`[session] switch: loading ACP session history ${target.acpSessionId}`);
             const cwd = this.resolveWorkingDirectory();
             try {
+              this.startReplayCapture();
               const loaded = await this.session.loadSessionHistory(target.acpSessionId, cwd);
               if (loaded) {
                 this.store.setAcpSessionId(target.acpSessionId);
