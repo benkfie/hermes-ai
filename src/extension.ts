@@ -336,9 +336,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const sendToChat = (text: string) => {
     panel.post({ type: 'statusBar' }); // nudge
     // Queue the text as if the user typed it
-    panel.post({ type: 'append', text: `
-[Context] ${text}
-` });
+    panel.post({ type: 'append', text: `\n[Context] ${text}\n` });
   };
   const ctxDisposables = registerContextCommands(context, sendToChat);
   context.subscriptions.push(...ctxDisposables);
@@ -435,6 +433,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           }
         } catch (err) {
           outputChannel.appendLine(`[session] failed to load ACP session: ${err}`);
+        }
+      }
+
+      // Sync local-only sessions (with messages but no acpSessionId) to the ACP server.
+      // This ensures sessions created locally before the extension connected to ACP
+      // are available on the ACP server for cross-device resume.
+      const localSessions = panel.getLocalUnsyncedSessions();
+      if (localSessions.length > 0) {
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+        outputChannel.appendLine(`[session] syncing ${localSessions.length} local session(s) to ACP server`);
+        for (const localSession of localSessions) {
+          try {
+            outputChannel.appendLine(`[session] creating ACP session for local session ${localSession.id} (${localSession.messages.length} messages)`);
+            const acpSessionId = await client.createSessionWithHistory(localSession.messages, cwd);
+            if (acpSessionId) {
+              panel.setAcpSessionIdForSession(localSession.id, acpSessionId);
+              outputChannel.appendLine(`[session] synced local session ${localSession.id} → ACP ${acpSessionId}`);
+            }
+          } catch (err) {
+            outputChannel.appendLine(`[session] failed to sync local session ${localSession.id}: ${err}`);
+          }
         }
       }
     } catch (err) {

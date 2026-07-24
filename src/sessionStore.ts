@@ -190,6 +190,20 @@ export class SessionStore {
     return this.active()?.acpSessionId;
   }
 
+  /** Get local sessions that have messages but no acpSessionId (unsynced to ACP). */
+  getLocalUnsyncedSessions(): ChatSession[] {
+    return this.sessions.filter(s => s.messages.length > 0 && !s.acpSessionId);
+  }
+
+  /** Set acpSessionId for a specific session by its local id. */
+  setAcpSessionIdForSession(sessionId: string, acpId: string): void {
+    const s = this.sessions.find(s => s.id === sessionId);
+    if (s) {
+      s.acpSessionId = acpId;
+      this.persist();
+    }
+  }
+
   // ── Ensure first session ───────────────────────────
 
   ensureSession(): void {

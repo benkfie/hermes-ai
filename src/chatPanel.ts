@@ -12,7 +12,7 @@ import { SessionStore } from './sessionStore';
 import { loadHermesModelGroups, ModelMenuGroup } from './modelCatalog';
 import { loadHermesSkills, SkillGroup } from './skillCatalog';
 import { buildChatHtml, escapeHtml } from './htmlTemplate';
-import type { StoredMessage, ToWebview, FromWebview } from './types';
+import type { StoredMessage, ChatSession, ToWebview, FromWebview } from './types';
 import { showDiff } from './hosts/VscodeDiffViewProvider';
 
 export class ChatPanelProvider implements vscode.WebviewViewProvider {
@@ -308,9 +308,19 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
     }
 
   /** Get the stored ACP session ID for auto-resume after connection. */
-  getStoredAcpSessionId(): string | undefined {
-    return this.store.getAcpSessionId();
-  }
+    getStoredAcpSessionId(): string | undefined {
+      return this.store.getAcpSessionId();
+    }
+
+    /** Get local sessions that have messages but no acpSessionId, for ACP sync. */
+    getLocalUnsyncedSessions(): ChatSession[] {
+      return this.store.getLocalUnsyncedSessions();
+    }
+
+    /** Set the acpSessionId for a specific local session after ACP sync. */
+    setAcpSessionIdForSession(sessionId: string, acpId: string): void {
+      this.store.setAcpSessionIdForSession(sessionId, acpId);
+    }
 
   /**
    * Re-read model visibility from disk and push updated model menu to webview.
