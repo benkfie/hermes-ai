@@ -255,20 +255,47 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
 
   const permissionHandler: PermissionRequestHandler = async (_method, params) => {
-    const toolName = typeof (params as any)?.toolName === 'string' ? (params as any).toolName : 'an action';
-    const reason = typeof (params as any)?.reason === 'string' ? (params as any).reason : undefined;
-    const filePath = typeof (params as any)?.filePath === 'string' ? (params as any).filePath : undefined;
+    // ACP session/request_permission params: { sessionId, toolCall, options }
+    const p = params as any;
+    const toolCall = p?.toolCall ?? {};
+    const toolName =
+      typeof toolCall?.title === 'string' && toolCall.title
+        ? toolCall.title
+        : typeof p?.toolName === 'string' ? p.toolName : 'an action';
+    // Extract file path from toolCall locations if present
+    let filePath: string | undefined;
+    const locations = toolCall?.locations;
+    if (Array.isArray(locations) && locations.length > 0 && typeof locations[0]?.path === 'string') {
+      filePath = locations[0].path;
+    }
+    // Pass through the server-provided options so optionIds always match
+    const rawOptions = Array.isArray(p?.options) ? p.options : [];
+    const options = rawOptions
+      .map((o: any) => ({
+        optionId: String(o?.optionId ?? o?.option_id ?? ''),
+        label: String(o?.name ?? o?.label ?? o?.optionId ?? o?.option_id ?? ''),
+      }))
+      .filter((o: any) => o.optionId);
 
-    // Use QuickPick-based permission UI
-    const selectedOption = await requestPermission({ toolName, reason, filePath });
+    const selectedOption = await requestPermission({
+      toolName,
+      filePath,
+      options: options.length > 0 ? options : undefined,
+    });
 
-    if (!selectedOption || selectedOption.startsWith('deny')) {
+    if (!selectedOption || selectedOption.startsWith('deny') || selectedOption.startsWith('reject')) {
       outputChannel.appendLine(`[security] permission denied for ${toolName}`);
-      throw new Error('Permission denied by user');
+      // Per ACP spec: respond with a cancelled/rejected outcome (nested shape)
+      return { outcome: { outcome: 'cancelled' } };
     }
 
     outputChannel.appendLine(`[security] permission granted: ${selectedOption} for ${toolName}`);
-    return { outcome: 'selected', optionId: selectedOption };
+    // ACP RequestPermissionResponse requires the NESTED outcome shape:
+    // { outcome: { outcome: 'selected', optionId: '<id>' } }
+    // The previous flat shape { outcome: 'selected', optionId } made the
+    // server read outcome='selected' (a string) and treat EVERY approval
+    // as a denial — edits were always rejected even when the user allowed.
+    return { outcome: { outcome: 'selected', optionId: selectedOption } };
   };
 
   const session = new SessionManager(client, line => outputChannel.appendLine(line), permissionHandler);
