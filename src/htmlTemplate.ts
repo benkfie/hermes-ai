@@ -826,6 +826,8 @@ const CSS_TEMPLATE = /* css */ `
       border-radius: var(--radius-md);
       margin: 4px 0;
       overflow: hidden;
+      flex-shrink: 0;
+      min-height: 2em;
       font-family: var(--vscode-editor-font-family, 'Courier New', monospace);
       font-size: 0.82em;
     }

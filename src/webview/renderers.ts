@@ -100,6 +100,12 @@ export function renderTerminalBlock(
     const body = document.createElement('pre');
     body.className = 'term-body';
     block.appendChild(body);
+  } else {
+    // Update header command text if it changed (e.g. from 'pending...' to real command)
+    const cmdEl = block.querySelector('.term-cmd') as HTMLElement;
+    if (cmdEl) {
+      cmdEl.innerHTML = escapeTerm(command);
+    }
   }
 
   const body = block.querySelector('.term-body') as HTMLElement;

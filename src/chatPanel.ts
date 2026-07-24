@@ -227,6 +227,11 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage(msg);
   }
 
+  /** Get the stored ACP session ID for auto-resume after connection. */
+  getStoredAcpSessionId(): string | undefined {
+    return this.store.getAcpSessionId();
+  }
+
   /**
    * Re-read model visibility from disk and push updated model menu to webview.
    * Called by extension.ts when settings panel saves visibility changes.
@@ -456,6 +461,22 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
     this.busy = true;
     this.post({ type: 'busy', active: true, queued: this.messageQueue.length });
     const cwd = this.resolveWorkingDirectory();
+
+    // Gate: if the ACP client is not running, show an error and bail.
+    // This prevents silent hangs when the user sends a prompt before
+    // the ACP connection is established (e.g. sidebar opened but not connected).
+    if (!this.session.isReady()) {
+      this.log('[ui] prompt rejected: ACP client not connected');
+      this.post({ type: 'error', text: 'Not connected to Hermes. Click the Hermes status bar icon to connect.' });
+      this.busy = false;
+      this.post({ type: 'busy', active: false });
+      // Drain queue
+      if (this.messageQueue.length > 0) {
+        const next = this.messageQueue.shift()!;
+        void this.runPrompt(next);
+      }
+      return;
+    }
 
     // Prepend IDE context + attached file for regular messages (not slash commands)
     let prompt = text;

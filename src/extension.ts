@@ -387,6 +387,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await client.start();
       outputChannel.appendLine('[acp] connected');
       setStatus('connected');
+
+      // After connecting, try to resume the stored ACP session and load its history.
+      // This ensures the webview shows up-to-date content from the ACP server,
+      // not stale local-only messages.
+      const storedAcpId = panel.getStoredAcpSessionId();
+      if (storedAcpId) {
+        outputChannel.appendLine(`[session] auto-loading ACP session ${storedAcpId} after connect`);
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+        session.setStoredSessionId(storedAcpId);
+        // Attempt to load the session history from the ACP server.
+        // This will stream history via onUpdate → ChatPanel → webview.
+        try {
+          const loaded = await session.loadSessionHistory(storedAcpId, cwd);
+          if (loaded) {
+            outputChannel.appendLine(`[session] resumed ACP session ${storedAcpId}`);
+          } else {
+            outputChannel.appendLine(`[session] ACP session ${storedAcpId} not found, will create new on first prompt`);
+          }
+        } catch (err) {
+          outputChannel.appendLine(`[session] failed to load ACP session: ${err}`);
+        }
+      }
     } catch (err) {
       outputChannel.appendLine(`[acp] connect failed: ${err}`);
       setStatus('disconnected');

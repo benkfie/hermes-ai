@@ -77,6 +77,11 @@ export class SessionManager {
     this.updateHandler = handler;
   }
 
+  /** Check if the ACP client is connected and ready for prompts. */
+  isReady(): boolean {
+    return this.client.running;
+  }
+
   /** Set a stored ACP session ID for resume attempts. */
     setStoredSessionId(id: string | undefined): void {
       this.storedSessionId = id ?? null;
@@ -175,9 +180,15 @@ export class SessionManager {
 
     // Wrap the call in a cancellable promise so cancel() can unblock us immediately
     // without having to wait for Hermes to finish processing session/cancel.
+    // A 120-second timeout prevents indefinite hangs if the ACP process stalls.
     let promptResponse: Record<string, unknown> = {};
     await new Promise<void>((resolve, reject) => {
       this.promptReject = reject;
+      const timeout = setTimeout(() => {
+        this.promptReject = null;
+        this.log('[session] prompt timed out after 120s');
+        reject(new Error('Prompt timed out — Hermes did not respond in 120 seconds'));
+      }, 120_000);
 
       this.client
         .call('session/prompt', {
@@ -185,10 +196,14 @@ export class SessionManager {
           prompt: [{ type: 'text', text }],
         })
         .then((result) => {
+          clearTimeout(timeout);
           promptResponse = (result as Record<string, unknown>) ?? {};
           resolve();
         })
-        .catch(reject)
+        .catch((err) => {
+          clearTimeout(timeout);
+          reject(err);
+        })
         .finally(() => {
           this.promptReject = null;
         });
