@@ -546,16 +546,19 @@ window.addEventListener('message', (e: MessageEvent) => {
         || msg.toolKind === 'shell'
         || /bash|terminal|shell|command|execute|run|cmd|write|edit|patch/i.test(msg.toolName ?? ''));
 
-      if (isTerminal && msg.toolName) {
-        const cmd = S.toolCommandMap.get(msg.toolCallId ?? '') || msg.toolName;
-        renderTerminalBlock(messagesEl, msg.toolCallId ?? '', cmd, (msg as any).toolOutput ?? '', isDone);
-      } else {
-        const toolEl = appendDiv(messagesEl, 'msg tool');
-        if (msg.toolCallId) toolEl.dataset.toolId = msg.toolCallId;
-        const { label, info } = formatToolDisplay(msg.toolName ?? '', msg.toolKind, msg.toolLocations, msg.toolDetail);
-        const infoHtml = info ? `<span class="tool-detail">${DOMPurify.sanitize(info)}</span>` : '';
-        toolEl.innerHTML = `<span class="tool-status${statusClass}">${statusIcon}</span><span class="tool-name">${label}</span>${infoHtml}`;
-      }
+      console.error('[Hermes webview] isTerminal:', isTerminal, 'toolName:', msg.toolName, 'toolKind:', msg.toolKind, 'hasOutput:', hasOutput);
+            if (isTerminal && msg.toolName) {
+              const cmd = S.toolCommandMap.get(msg.toolCallId ?? '') || msg.toolName;
+              console.error('[Hermes webview] RENDER terminal block, cmd:', cmd);
+              renderTerminalBlock(messagesEl, msg.toolCallId ?? '', cmd, (msg as any).toolOutput ?? '', isDone);
+            } else {
+              const toolEl = appendDiv(messagesEl, 'msg tool');
+              if (msg.toolCallId) toolEl.dataset.toolId = msg.toolCallId;
+              const { label, info } = formatToolDisplay(msg.toolName ?? '', msg.toolKind, msg.toolLocations, msg.toolDetail);
+              console.error('[Hermes webview] RENDER tool block, label:', label, 'info:', info);
+              const infoHtml = info ? `<span class="tool-detail">${DOMPurify.sanitize(info)}</span>` : '';
+              toolEl.innerHTML = `<span class="tool-status${statusClass}">${statusIcon}</span><span class="tool-name">${label}</span>${infoHtml}`;
+            }
       autoScroll();
       break;
     }
