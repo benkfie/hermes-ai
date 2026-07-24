@@ -281,21 +281,31 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
   }
 
   private finishReplayCapture(): void {
-    if (!this.replayingHistory) return;
-    this.replayingHistory = false;
-    if (this.replayTimer) { clearTimeout(this.replayTimer); this.replayTimer = null; }
-    if (this.replayBuffer.length > 0) {
-      const s = this.store.active();
-      if (s) {
-        // Replace local messages with the synced replay (server is source of truth)
-        s.messages = [...this.replayBuffer];
-        this.store.persistActive();
-        this.log(`[session] replay captured ${this.replayBuffer.length} messages into store`);
+      if (!this.replayingHistory) return;
+      this.replayingHistory = false;
+      if (this.replayTimer) { clearTimeout(this.replayTimer); this.replayTimer = null; }
+      if (this.replayBuffer.length > 0) {
+        const s = this.store.active();
+        if (s) {
+          const beforeCount = s.messages.length;
+          // SAFETY: Only replace local messages if replay returned something meaningful
+          if (this.replayBuffer.length === 0) {
+            this.log('[session] replay returned 0 messages — keeping existing local history');
+          } else {
+            // Replace local messages with the synced replay (server is source of truth)
+            s.messages = [...this.replayBuffer];
+            this.store.persistActive();
+            this.log(`[session] replay captured ${this.replayBuffer.length} messages into store (was ${beforeCount})`);
+            // SAFETY: Warn if we're replacing a non-empty local history with fewer messages
+            if (beforeCount > 0 && this.replayBuffer.length < beforeCount) {
+              this.log(`[session] WARNING: replay has fewer messages (${this.replayBuffer.length}) than local history (${beforeCount}) — potential data loss`);
+            }
+          }
+        }
       }
+      this.replayBuffer = [];
+      this.broadcastSessions(this.store);
     }
-    this.replayBuffer = [];
-    this.broadcastSessions(this.store);
-  }
 
   /** Get the stored ACP session ID for auto-resume after connection. */
   getStoredAcpSessionId(): string | undefined {
