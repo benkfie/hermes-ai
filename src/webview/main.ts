@@ -626,6 +626,8 @@ window.addEventListener('message', (e: MessageEvent) => {
       }
       appendMessage(messagesEl, 'error', `Error: ${msg.text}`);
       S.currentAgentEl = null; S.currentAgentText = ''; S.thinkingStatusEl = null;
+      setBusy(false);
+      inputEl.focus();
       break;
 
     case 'status':
