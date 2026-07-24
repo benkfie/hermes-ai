@@ -457,7 +457,6 @@ window.addEventListener('message', (e: MessageEvent) => {
 
     case 'toolOutput': {
           // Live streaming chunk for a terminal/execute tool
-          console.error('[Hermes webview] toolOutput msg:', JSON.stringify(msg));
           const toolId = msg.toolCallId;
       const chunk = msg.text ?? '';
       if (!toolId || !chunk) break;
@@ -481,7 +480,6 @@ window.addEventListener('message', (e: MessageEvent) => {
     }
 
     case 'toolCall': {
-          console.error('[Hermes webview] toolCall msg:', JSON.stringify(msg));
           // tool_call_update — update existing tool
           if (!msg.toolName && msg.toolCallId) {
         const existing = document.querySelector(`[data-tool-id="${msg.toolCallId}"]`);
@@ -546,19 +544,15 @@ window.addEventListener('message', (e: MessageEvent) => {
         || msg.toolKind === 'shell'
         || /bash|terminal|shell|command|execute|run|cmd|write|edit|patch/i.test(msg.toolName ?? ''));
 
-      console.error('[Hermes webview] isTerminal:', isTerminal, 'toolName:', msg.toolName, 'toolKind:', msg.toolKind, 'hasOutput:', hasOutput);
             if (isTerminal && msg.toolName) {
               const cmd = S.toolCommandMap.get(msg.toolCallId ?? '') || msg.toolName;
-              console.error('[Hermes webview] RENDER terminal block, cmd:', cmd);
                       renderTerminalBlock(messagesEl, msg.toolCallId ?? '', cmd, (msg as any).toolOutput ?? '', isDone);
                       // Check if the block is actually visible
                       const tb = document.querySelector(`[data-term-id="${msg.toolCallId}"]`);
-                      console.error('[Hermes webview] TERMINAL BLOCK EXISTS:', !!tb, 'offsetHeight:', tb?.scrollHeight, 'parent:', tb?.parentElement?.id);
             } else {
               const toolEl = appendDiv(messagesEl, 'msg tool');
               if (msg.toolCallId) toolEl.dataset.toolId = msg.toolCallId;
               const { label, info } = formatToolDisplay(msg.toolName ?? '', msg.toolKind, msg.toolLocations, msg.toolDetail);
-              console.error('[Hermes webview] RENDER tool block, label:', label, 'info:', info);
               const infoHtml = info ? `<span class="tool-detail">${DOMPurify.sanitize(info)}</span>` : '';
               toolEl.innerHTML = `<span class="tool-status${statusClass}">${statusIcon}</span><span class="tool-name">${label}</span>${infoHtml}`;
             }
