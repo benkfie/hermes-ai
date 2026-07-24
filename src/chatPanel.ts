@@ -420,42 +420,44 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
       this.broadcastSessions(this.store);
 
     } else if (msg.type === 'switchSession' && msg.sessionId) {
-          this.log(`[ui] switch session ${msg.sessionId}`);
-          const target = this.store.switchTo(msg.sessionId);
-          if (!target) return;
+              this.log(`[ui] switch session ${msg.sessionId}`);
+              const target = this.store.switchTo(msg.sessionId);
+              if (!target) return;
 
-          this.messageQueue = [];
-          this.lastTurnText = '';
-          this.lastTurnTools = [];
-          this.session.reset();
-          if (target.acpSessionId) {
-            this.session.setStoredSessionId(target.acpSessionId);
-            this.log(`[session] will attempt resume of ACP session ${target.acpSessionId}`);
-          }
-
-          this.post({ type: 'clear' });
-          this.post({ type: 'statusBar', sessionTitle: target.title });
-          this.broadcastSessions(this.store);
-
-          if (target.messages.length > 0) {
-            this.post({ type: 'loadHistory', history: target.messages, activeSessionId: target.id });
-          } else if (target.acpSessionId) {
-            // Load history from ACP server — replay will stream to webview via onUpdate
-            this.log(`[session] switch: loading ACP session history ${target.acpSessionId}`);
-            const cwd = this.resolveWorkingDirectory();
-            try {
-              this.startReplayCapture();
-              const loaded = await this.session.loadSessionHistory(target.acpSessionId, cwd);
-              if (loaded) {
-                this.store.setAcpSessionId(target.acpSessionId);
-                this.log(`[session] switch: resumed ${target.acpSessionId}`);
-              } else {
-                this.log(`[session] switch: ACP session ${target.acpSessionId} not found, showing blank`);
+              this.messageQueue = [];
+              this.lastTurnText = '';
+              this.lastTurnTools = [];
+              this.session.reset();
+          
+              if (target.acpSessionId) {
+                this.session.setStoredSessionId(target.acpSessionId);
+                this.log(`[session] will attempt resume of ACP session ${target.acpSessionId}`);
               }
-            } catch (err) {
-              this.log(`[session] switch: failed to load ACP session history: ${err}`);
-            }
-          }
+
+              this.post({ type: 'clear' });
+              this.post({ type: 'statusBar', sessionTitle: target.title });
+              this.broadcastSessions(this.store);
+
+              // Always load from server for ACP sessions - server is source of truth
+              if (target.acpSessionId) {
+                this.log(`[session] switch: loading ACP session history ${target.acpSessionId}`);
+                const cwd = this.resolveWorkingDirectory();
+                try {
+                  this.startReplayCapture();
+                  const loaded = await this.session.loadSessionHistory(target.acpSessionId, cwd);
+                  if (loaded) {
+                    this.store.setAcpSessionId(target.acpSessionId);
+                    this.log(`[session] switch: resumed ${target.acpSessionId}`);
+                  } else {
+                    this.log(`[session] switch: ACP session ${target.acpSessionId} not found, showing blank`);
+                  }
+                } catch (err) {
+                  this.log(`[session] switch: failed to load ACP session history: ${err}`);
+                }
+              } else if (target.messages.length > 0) {
+                // Pure local session (no ACP) - show local history
+                this.post({ type: 'loadHistory', history: target.messages, activeSessionId: target.id });
+              }
 
     } else if (msg.type === 'attachFile') {
       // Open file picker and send selected file info back to webview
@@ -495,21 +497,22 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
       this.attachedFiles = [];
 
     } else if (msg.type === 'renameSession' && msg.sessionId) {
-      const s = this.store.allSessions().find(s => s.id === msg.sessionId);
-      if (!s) return;
-      const newName = await vscode.window.showInputBox({
-        prompt: 'Rename session',
-        value: s.title,
-        placeHolder: 'Session name',
-      });
-      if (newName !== undefined && newName.trim()) {
-        this.store.rename(msg.sessionId, newName.trim());
-        this.broadcastSessions(this.store);
-        if (msg.sessionId === this.store.activeId) {
-          this.post({ type: 'statusBar', sessionTitle: newName.trim().slice(0, 60) });
-          void this.runPrompt(`/title ${newName.trim().slice(0, 60)}`);
-        }
-      }
+          const sessions = await this.store.allSessions();
+          const s = sessions.find(s => s.id === msg.sessionId);
+          if (!s) return;
+          const newName = await vscode.window.showInputBox({
+            prompt: 'Rename session',
+            value: s.title,
+            placeHolder: 'Session name',
+          });
+          if (newName !== undefined && newName.trim()) {
+            this.store.rename(msg.sessionId, newName.trim());
+            this.broadcastSessions(this.store);
+            if (msg.sessionId === this.store.activeId) {
+              this.post({ type: 'statusBar', sessionTitle: newName.trim().slice(0, 60) });
+              void this.runPrompt(`/title ${newName.trim().slice(0, 60)}`);
+            }
+          }
 
     } else if (msg.type === 'deleteSession' && msg.sessionId) {
       if (this.store.deleteSession(msg.sessionId)) {

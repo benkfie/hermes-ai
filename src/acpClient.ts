@@ -27,6 +27,13 @@ interface PendingRequest {
   reject: (err: Error) => void;
 }
 
+export interface AcpSessionInfo {
+  session_id: string;
+  cwd: string;
+  title?: string;
+  updated_at?: string;
+}
+
 export class AcpClient extends EventEmitter {
   private proc: ChildProcess | null = null;
   private nextId = 1;
@@ -216,5 +223,23 @@ export class AcpClient extends EventEmitter {
     } else {
       this.replyError(id, -32601, `No handler for ${method}`);
     }
+  }
+
+  /** List all ACP sessions from the server. */
+  async listSessions(cwd?: string): Promise<AcpSessionInfo[]> {
+    const result = await this.call('session/list', { cwd }) as { sessions: AcpSessionInfo[]; next_cursor?: string };
+    return result?.sessions ?? [];
+  }
+
+  /** Get a single ACP session by ID. */
+  async getSession(sessionId: string): Promise<AcpSessionInfo | null> {
+    const result = await this.call('session/get', { sessionId }) as { session: AcpSessionInfo } | null;
+    return result?.session ?? null;
+  }
+
+  /** Create a new ACP session with initial history. */
+  async createSessionWithHistory(messages: unknown[], cwd: string): Promise<string> {
+    const result = await this.call('session/create_with_history', { messages, cwd }) as { sessionId: string };
+    return result?.sessionId ?? '';
   }
 }

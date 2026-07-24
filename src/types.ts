@@ -18,6 +18,7 @@ export interface ChatSession {
   createdAt: number;
   messages: StoredMessage[];
   acpSessionId?: string;
+  lastActive?: number;
 }
 
 // ── Todo ─────────────────────────────────────────────

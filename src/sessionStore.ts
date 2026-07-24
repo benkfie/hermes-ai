@@ -2,37 +2,41 @@
  * Session persistence layer.
  *
  * Manages ChatSession[] in VS Code workspaceState.
- * Also reads sessions from Hermes CLI (`hermes sessions list`) to show
- * sessions created via the CLI/TUI.
+ * Also reads sessions from ACP server (`session/list`) to show
+ * sessions created via the CLI/TUI/desktop app.
  */
+
 import * as vscode from 'vscode';
-import { execSync } from 'child_process';
 import type { ChatSession, StoredMessage } from './types';
+import type { AcpClient, AcpSessionInfo } from './acpClient';
 
 const SESSIONS_KEY = 'hermes-ai.sessions';
 const MAX_SESSIONS = 20;
 const MAX_MESSAGES_PER_SESSION = 300;
 
-export interface HermesCliSession {
-  id: string;
-  title: string;
-  preview: string;
-  lastActive: string;
-}
-
 export class SessionStore {
   private sessions: ChatSession[] = [];
   private activeSessionId = '';
+  private acpClient: AcpClient | null = null;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly getCwd: () => string = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd()
+  ) {
     const saved = context.workspaceState.get<ChatSession[]>(SESSIONS_KEY);
     if (saved && saved.length > 0) {
-      this.sessions = saved.map(s => ({ ...s, messages: s.messages ?? [] }));
-      this.activeSessionId = this.sessions[this.sessions.length - 1].id;
+      this.sessions = saved.map(s => ({ ...s, messages: s.messages ?? [], lastActive: s.lastActive ?? 0 }));
+      // Find the most recently active session
+      this.activeSessionId = this.sessions
+        .sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0))[0]?.id ?? '';
     }
   }
 
-  // ── Getters ────────────────────────────────────────
+  setAcpClient(client: AcpClient): void {
+    this.acpClient = client;
+  }
+
+  // ── Getters ────────────────────────────────────────────
 
   get activeId(): string { return this.activeSessionId; }
 
@@ -40,83 +44,75 @@ export class SessionStore {
     return this.sessions.find(s => s.id === this.activeSessionId);
   }
 
-  allSessions(): ChatSession[] {
-    // Merge extension sessions with Hermes CLI sessions
-    const hermesSessions = this.readHermesSessions();
-    // Convert Hermes sessions to ChatSession format
-    const converted: ChatSession[] = hermesSessions.map(hs => ({
-      id: hs.id,
-      title: hs.title || hs.preview || 'untitled',
-      createdAt: Date.now(), // approximate
-      messages: [],
-      acpSessionId: hs.id,
-    }));
-
-    // Deduplicate by ID, preferring existing extension sessions
-    const existingIds = new Set(this.sessions.map(s => s.id));
-    const merged = [...this.sessions];
-    for (const cs of converted) {
-      if (!existingIds.has(cs.id)) {
-        merged.push(cs);
-        existingIds.add(cs.id);
-      }
+  async allSessions(): Promise<ChatSession[]> {
+    if (!this.acpClient) {
+      return [...this.sessions].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
     }
 
-    // Sort: newest first (approximate by ID order)
-    return merged;
+    try {
+      const acpSessions = await this.acpClient.listSessions(this.getCwd());
+      const byAcpId = new Map(acpSessions.map(s => [s.session_id, s]));
+      
+      // Start with extension sessions (they have local messages)
+      const merged = [...this.sessions];
+      
+      // Add ACP sessions that don't have a corresponding extension session
+      for (const acp of acpSessions) {
+        const existing = this.sessions.find(s => s.acpSessionId === acp.session_id);
+        if (!existing) {
+          merged.push({
+            id: `ext-${acp.session_id}`,  // prefix to avoid collision
+            title: acp.title || acp.session_id.slice(0, 8),
+            createdAt: Date.now(),
+            messages: [],
+            acpSessionId: acp.session_id,
+            lastActive: acp.updated_at ? new Date(acp.updated_at).getTime() : 0,
+          });
+        } else {
+          // Update title from server if it's more recent
+          if (acp.updated_at && acp.title && existing.title !== acp.title) {
+            existing.title = acp.title;
+            existing.lastActive = new Date(acp.updated_at).getTime();
+          }
+        }
+      }
+      
+      // Sort by lastActive descending (newest first)
+      return merged.sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
+    } catch (err) {
+      console.error('[SessionStore] Failed to fetch ACP sessions:', err);
+      return [...this.sessions].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
+    }
   }
 
   allSessionsReversed(): ChatSession[] {
-    return [...this.allSessions()].reverse();
-  }
-
-  /**
-   * Read Hermes CLI sessions via `hermes sessions list`.
-   */
-  private readHermesSessions(): HermesCliSession[] {
-    try {
-      const output = execSync('hermes sessions list', {
-        encoding: 'utf8',
-        timeout: 5000,
-        env: { ...process.env },
-      });
-      return parseSessionList(output);
-    } catch {
-      return [];
-    }
+    // For backwards compatibility - sync version
+    // Note: this won't include ACP sessions, call async allSessions() instead
+    return [...this.sessions].reverse();
   }
 
   // ── Create / Switch / Delete ───────────────────────
 
   createSession(title: string): string {
     const id = `s${Date.now()}`;
-    this.sessions.push({ id, title, createdAt: Date.now(), messages: [] });
+    this.sessions.push({ id, title, createdAt: Date.now(), messages: [], lastActive: Date.now() });
     this.activeSessionId = id;
     if (this.sessions.length > MAX_SESSIONS) {
-      this.sessions = this.sessions.slice(-MAX_SESSIONS);
+      // Keep newest by lastActive
+      this.sessions.sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
+      this.sessions = this.sessions.slice(0, MAX_SESSIONS);
     }
     this.persist();
     return id;
   }
 
   switchTo(sessionId: string): ChatSession | undefined {
-    // Check extension sessions first, then Hermes sessions
+    // Check extension sessions first
     let target = this.sessions.find(s => s.id === sessionId);
-    if (!target) {
-      // It might be a Hermes CLI session — create an extension session for it
-      const hermesSessions = this.readHermesSessions();
-      const hs = hermesSessions.find(h => h.id === sessionId);
-      if (hs) {
-        target = {
-          id: hs.id,
-          title: hs.title || hs.preview || 'untitled',
-          createdAt: Date.now(),
-          messages: [],
-          acpSessionId: hs.id,
-        };
-        this.sessions.push(target);
-        this.persist();
-      }
+    if (!target && this.acpClient) {
+      // Might be an ACP session - create extension wrapper
+      // This will be handled async in chatPanel via allSessions()
+      target = this.sessions.find(s => s.acpSessionId === sessionId);
     }
     if (!target || target.id === this.activeSessionId) return undefined;
     this.activeSessionId = sessionId;
@@ -135,6 +131,7 @@ export class SessionStore {
     const s = this.sessions.find(s => s.id === sessionId);
     if (!s) return false;
     s.title = newTitle.slice(0, 60);
+    s.lastActive = Date.now();
     this.persist();
     return true;
   }
@@ -151,6 +148,7 @@ export class SessionStore {
     if (!DEFAULT_TITLES.has(s.title)) return s.title;
     s.title = text.slice(0, 38).replace(/\s+/g, ' ').trim();
     if (text.length > 38) s.title = s.title.slice(0, 35) + '\u2026';
+    s.lastActive = Date.now();
     this.persist();
     return s.title;
   }
@@ -161,6 +159,7 @@ export class SessionStore {
     const s = this.active();
     if (s) {
       s.messages.push({ role: 'user', text });
+      s.lastActive = Date.now();
       this.persist();
     }
   }
@@ -173,6 +172,7 @@ export class SessionStore {
     if (s.messages.length > MAX_MESSAGES_PER_SESSION) {
       s.messages = s.messages.slice(-MAX_MESSAGES_PER_SESSION);
     }
+    s.lastActive = Date.now();
     this.persist();
   }
 
@@ -199,7 +199,7 @@ export class SessionStore {
   }
 
   // ── Persistence ────────────────────────────────────
-
+  
   /** Persist the currently active session (used after replay sync). */
   persistActive(): void {
     this.persist();
@@ -208,80 +208,4 @@ export class SessionStore {
   private persist(): void {
     void this.context.workspaceState.update(SESSIONS_KEY, this.sessions);
   }
-}
-
-/**
- * Parse `hermes sessions list` output into HermesCliSession[].
- *
- * Output format (4 columns):
- *   Title                        Workspace          Last Active   ID
- *   ─────────────────────────────────────────────────────────────
- *   ACP Terminal Streaming Pla   Hermes_Extension   just now      abc123...
- *   —                            —                  1h ago        def456...
- */
-function parseSessionList(output: string): HermesCliSession[] {
-  const sessions: HermesCliSession[] = [];
-  const lines = output.split('\n');
-  let headerFound = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    // Skip the header and separator lines
-    if (!headerFound) {
-      if (trimmed.startsWith('Title')) {
-        headerFound = true;
-      }
-      continue;
-    }
-    if (trimmed.startsWith('─') || trimmed.startsWith('┌') || trimmed.startsWith('└') || trimmed.startsWith('│')) continue;
-
-    // Parse session line: "Title    Workspace    Last Active    ID"
-    // The ID is always the last column. Format: UUID or timestamp-based ID
-    const idMatch = trimmed.match(/\s+([\w-]{8,}(?:[\w-]{4,})*)$/);
-    if (!idMatch) continue;
-
-    const id = idMatch[1];
-    const beforeId = trimmed.substring(0, trimmed.length - idMatch[0].length).trim();
-
-    // Split remaining into title + workspace + lastActive
-    // Last active patterns: "just now", "5m ago", "1h ago", "2026-07-13", "yesterday"
-    const lastActiveMatch = beforeId.match(/\s+(just now|\d+[mhd] ago|yesterday|\d{4}-\d{2}-\d{2}|\d{1,2}h ago)$/);
-    let titleAndWorkspace = beforeId;
-    let lastActive = '';
-    if (lastActiveMatch) {
-      lastActive = lastActiveMatch[1];
-      titleAndWorkspace = beforeId.substring(0, beforeId.length - lastActiveMatch[0].length).trim();
-    }
-
-    // Split title and workspace - workspace is the second column
-    // The CLI uses fixed-width columns: Title (~27 chars), Workspace (~18 chars)
-    // Split on multiple spaces to find the boundary
-    let title = '';
-    let workspace = '';
-    
-    // Try to split on 2+ consecutive spaces (column boundary)
-    const parts = titleAndWorkspace.split(/\s{2,}/);
-    if (parts.length >= 2) {
-      title = parts[0].trim();
-      workspace = parts.slice(1).join(' ').trim();
-    } else {
-      title = titleAndWorkspace;
-    }
-
-    // Clean up em dash placeholders
-    if (title === '—' || title === '') {
-      title = 'untitled';
-    }
-
-    sessions.push({
-      id,
-      title: title || 'untitled',
-      preview: workspace || '',
-      lastActive,
-    });
-  }
-
-  return sessions;
 }
