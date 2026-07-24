@@ -456,8 +456,9 @@ window.addEventListener('message', (e: MessageEvent) => {
       break;
 
     case 'toolOutput': {
-      // Live streaming chunk for a terminal/execute tool
-      const toolId = msg.toolCallId;
+          // Live streaming chunk for a terminal/execute tool
+          console.error('[Hermes webview] toolOutput msg:', JSON.stringify(msg));
+          const toolId = msg.toolCallId;
       const chunk = msg.text ?? '';
       if (!toolId || !chunk) break;
 
@@ -480,8 +481,9 @@ window.addEventListener('message', (e: MessageEvent) => {
     }
 
     case 'toolCall': {
-      // tool_call_update — update existing tool
-      if (!msg.toolName && msg.toolCallId) {
+          console.error('[Hermes webview] toolCall msg:', JSON.stringify(msg));
+          // tool_call_update — update existing tool
+          if (!msg.toolName && msg.toolCallId) {
         const existing = document.querySelector(`[data-tool-id="${msg.toolCallId}"]`);
         if (existing) {
           const isDone = msg.toolStatus === 'done' || msg.toolStatus === 'completed';
