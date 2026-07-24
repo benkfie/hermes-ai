@@ -550,7 +550,10 @@ window.addEventListener('message', (e: MessageEvent) => {
             if (isTerminal && msg.toolName) {
               const cmd = S.toolCommandMap.get(msg.toolCallId ?? '') || msg.toolName;
               console.error('[Hermes webview] RENDER terminal block, cmd:', cmd);
-              renderTerminalBlock(messagesEl, msg.toolCallId ?? '', cmd, (msg as any).toolOutput ?? '', isDone);
+                      renderTerminalBlock(messagesEl, msg.toolCallId ?? '', cmd, (msg as any).toolOutput ?? '', isDone);
+                      // Check if the block is actually visible
+                      const tb = document.querySelector(`[data-term-id="${msg.toolCallId}"]`);
+                      console.error('[Hermes webview] TERMINAL BLOCK EXISTS:', !!tb, 'offsetHeight:', tb?.scrollHeight, 'parent:', tb?.parentElement?.id);
             } else {
               const toolEl = appendDiv(messagesEl, 'msg tool');
               if (msg.toolCallId) toolEl.dataset.toolId = msg.toolCallId;
