@@ -25,11 +25,11 @@ export class SessionStore {
     ) {
       const saved = context.workspaceState.get<ChatSession[]>(SESSIONS_KEY);
       if (saved && saved.length > 0) {
-        // Filter out sessions with non-ACP acpSessionId (old TUI sessions that got mixed in)
-        // Only keep sessions with no acpSessionId (pure local) or valid ACP IDs (acp-...)
+        // Filter out legacy TUI sessions (which start with a date stamp, e.g. 20260706_013133_...)
+        // and backup sessions (which start with 'backup-'). Keep pure local and all valid UUID/ACP sessions.
         this.sessions = saved
           .map(s => ({ ...s, messages: s.messages ?? [], lastActive: s.lastActive ?? 0 }))
-          .filter(s => !s.acpSessionId || s.acpSessionId.startsWith('acp-'));
+          .filter(s => !s.acpSessionId || (!s.acpSessionId.startsWith('backup-') && !/^\d{8}_\d{6}_/.test(s.acpSessionId)));
         // Find the most recently active session
         this.activeSessionId = this.sessions
           .sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0))[0]?.id ?? '';
@@ -125,20 +125,38 @@ export class SessionStore {
   }
 
   switchTo(sessionId: string): ChatSession | undefined {
-      // Check extension sessions first
-      let target = this.sessions.find(s => s.id === sessionId);
-      if (!target) {
-        // Only try to find by acpSessionId if it's a valid ACP ID
-        if (sessionId.startsWith('acp-')) {
-          target = this.sessions.find(s => s.acpSessionId === sessionId);
+    // Check extension sessions first by local id
+    let target = this.sessions.find(s => s.id === sessionId);
+    if (!target) {
+      // If it starts with ext-, extract the acpSessionId
+      if (sessionId.startsWith('ext-')) {
+        const acpId = sessionId.slice(4);
+        target = this.sessions.find(s => s.acpSessionId === acpId);
+        if (!target) {
+          // It's a server session we haven't wrapped locally yet.
+          // Create a local session wrapping it!
+          target = {
+            id: sessionId,
+            title: acpId.slice(0, 8),
+            createdAt: Date.now(),
+            messages: [],
+            acpSessionId: acpId,
+            lastActive: Date.now(),
+          };
+          this.sessions.push(target);
+          this.persist();
         }
+      } else if (sessionId.startsWith('acp-')) {
+        // Fallback for raw ACP IDs
+        target = this.sessions.find(s => s.acpSessionId === sessionId);
       }
-      if (!target || target.id === this.activeSessionId) return undefined;
-      this.activeSessionId = target.id;
-      target.lastActive = Date.now();
-      this.persist();
-      return target;
     }
+    if (!target || target.id === this.activeSessionId) return undefined;
+    this.activeSessionId = target.id;
+    target.lastActive = Date.now();
+    this.persist();
+    return target;
+  }
 
   deleteSession(sessionId: string): boolean {
     if (sessionId === this.activeSessionId) return false;
