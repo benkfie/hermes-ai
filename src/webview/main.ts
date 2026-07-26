@@ -19,6 +19,17 @@ import {
 
 declare function acquireVsCodeApi(): { postMessage(msg: FromWebview): void };
 const vscode = acquireVsCodeApi();
+
+window.onerror = function (message, source, lineno, colno, error) {
+  const errText = `${message} at ${source}:${lineno}:${colno}`;
+  vscode.postMessage({ type: 'error' as any, text: errText });
+};
+
+window.addEventListener('unhandledrejection', (event) => {
+  const errText = `Unhandled promise rejection: ${event.reason}`;
+  vscode.postMessage({ type: 'error' as any, text: errText });
+});
+
 marked.setOptions({ breaks: true, gfm: true });
 
 // ── State ────────────────────────────────────────────

@@ -86,8 +86,12 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
       }
     }, 150);
 
-    webviewView.webview.onDidReceiveMessage((msg: FromWebview) => {
-      void this.handleFromWebview(msg);
+    webviewView.webview.onDidReceiveMessage((msg: any) => {
+      if (msg.type === 'error') {
+        this.log(`[webview-error] ${msg.text}`);
+      } else {
+        void this.handleFromWebview(msg);
+      }
     });
 
     // Route session updates to the webview
