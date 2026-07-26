@@ -49,21 +49,32 @@ export class SessionStore {
   }
 
   async allSessions(): Promise<ChatSession[]> {
+    console.warn('[SessionStore] allSessions called, acpClient exists:', !!this.acpClient);
     if (!this.acpClient) {
+      console.warn('[SessionStore] returning local sessions only:', this.sessions.length);
       return [...this.sessions].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
     }
 
+    const cwd = this.getCwd();
+    console.warn('[SessionStore] calling listSessions with cwd:', cwd);
     try {
-      const acpSessions = await this.acpClient.listSessions(this.getCwd());
+      const acpSessions = await this.acpClient.listSessions(cwd);
+      console.warn('[SessionStore] listSessions returned count:', acpSessions.length);
+      for (const s of acpSessions) {
+        console.warn(`[SessionStore] ACP session: ID=${s.session_id}, title=${s.title}, cwd=${s.cwd}, updated_at=${s.updated_at}`);
+      }
+      
       const byAcpId = new Map(acpSessions.map(s => [s.session_id, s]));
       
       // Start with extension sessions (they have local messages)
       const merged = [...this.sessions];
+      console.warn('[SessionStore] initial local sessions count:', this.sessions.length);
       
       // Add ACP sessions that don't have a corresponding extension session
       for (const acp of acpSessions) {
         const existing = this.sessions.find(s => s.acpSessionId === acp.session_id);
         if (!existing) {
+          console.warn('[SessionStore] merging new ACP session:', acp.session_id);
           merged.push({
             id: `ext-${acp.session_id}`,  // prefix to avoid collision
             title: acp.title || acp.session_id.slice(0, 8),
@@ -75,6 +86,7 @@ export class SessionStore {
         } else {
           // Update title from server if it's more recent
           if (acp.updated_at && acp.title && existing.title !== acp.title) {
+            console.warn('[SessionStore] updating existing session title:', existing.id, '->', acp.title);
             existing.title = acp.title;
             existing.lastActive = new Date(acp.updated_at).getTime();
           }
@@ -82,7 +94,9 @@ export class SessionStore {
       }
       
       // Sort by lastActive descending (newest first)
-      return merged.sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
+      const sorted = merged.sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
+      console.warn('[SessionStore] total merged sessions count:', sorted.length);
+      return sorted;
     } catch (err) {
       console.error('[SessionStore] Failed to fetch ACP sessions:', err);
       return [...this.sessions].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
