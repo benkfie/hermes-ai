@@ -82,6 +82,11 @@ export class SessionManager {
     return this.client.running;
   }
 
+  /** Expose the ACP client for session listing / store wiring. */
+  getClient(): AcpClient {
+    return this.client;
+  }
+
   /** Set a stored ACP session ID for resume attempts. */
     setStoredSessionId(id: string | undefined): void {
       this.storedSessionId = id ?? null;

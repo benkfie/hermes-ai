@@ -50,6 +50,8 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
     this.mediaRoot = path.join(this.context.globalStorageUri.fsPath, 'media');
     fs.mkdirSync(this.mediaRoot, { recursive: true });
     this.store = new SessionStore(context);
+    // Wire the ACP client into the store so it can fetch server-side sessions
+    this.store.setAcpClient(session.getClient());
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -96,7 +98,6 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
 
     // Route session updates to the webview
     this.session.onUpdate((event) => {
-      console.log('[ChatPanel] Received onUpdate event:', JSON.stringify(event, null, 2));
       if (event.text) {
         // Convert MEDIA:/path references to webview-safe img URIs
         const converted = this.convertMediaPaths(event.text, webviewView.webview);
@@ -333,6 +334,11 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
   refreshModelMenu(currentModel: string): void {
     const groups = this.modelGroups;
     this.post({ type: 'modelMenuUpdate', modelGroups: groups, currentModel });
+  }
+
+  /** Re-fetch sessions (including from ACP) and push to webview. */
+  refreshSessions(): void {
+    void this.broadcastSessions();
   }
 
   private saveTurnToSession(): void {

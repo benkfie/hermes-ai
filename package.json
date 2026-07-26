@@ -2,7 +2,7 @@
   "name": "hermes-ai",
   "displayName": "Hermes AI Agent",
   "description": "VS Code extension for the Hermes AI agent. ACP-powered chat, settings management, tool execution, and multi-model support.",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "publisher": "benkfie",
   "author": "benkfie",
   "license": "MIT",

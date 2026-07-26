@@ -413,6 +413,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       outputChannel.appendLine('[acp] connected');
       setStatus('connected');
 
+      // Now that ACP is live, refresh the session dropdown with server sessions
+      panel.refreshSessions();
+
       // After connecting, try to resume the stored ACP session and load its history.
       // This ensures the webview shows up-to-date content from the ACP server,
       // not stale local-only messages.
