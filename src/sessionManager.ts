@@ -261,7 +261,6 @@ export class SessionManager {
       if (!update) return;
 
       const kind = update.sessionUpdate as string;
-      console.log('[SessionManager] handleUpdate kind:', kind, 'update keys:', Object.keys(update || {}).join(','));
       const event: SessionUpdateEvent = { session_id };
 
     switch (kind) {
