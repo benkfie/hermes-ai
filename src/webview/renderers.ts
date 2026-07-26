@@ -89,13 +89,23 @@ export function renderTerminalBlock(
   isDone: boolean,
   append: boolean = false,
 ): HTMLElement {
+  const chatToggle = document.getElementById('autoscroll-chat') as HTMLInputElement | null;
+  const chatAutoScrollEnabled = chatToggle ? chatToggle.checked : true;
+  const isChatNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+
   let block = container.querySelector(`[data-term-id="${toolId}"]`);
   if (!block) {
     block = appendDiv(container, 'msg terminal');
     (block as HTMLElement).setAttribute('data-term-id', toolId);
     const header = document.createElement('div');
     header.className = 'term-header';
-    header.innerHTML = `<span class="term-icon">$</span><span class="term-cmd">${escapeTerm(command)}</span>`;
+    header.innerHTML = `<span class="term-icon">$</span><span class="term-cmd">${escapeTerm(command)}</span><div class="term-scroll-wrap" style="display: flex; align-items: center; gap: 4px; font-size: 0.85em; opacity: 0.8; user-select: none; margin-left: 8px;"><input type="checkbox" class="term-autoscroll" checked style="margin: 0; cursor: pointer;" /><span style="font-size: 0.95em;">Auto-scroll</span></div>`;
+    const autoscrollCb = header.querySelector('.term-autoscroll') as HTMLInputElement | null;
+    if (autoscrollCb) {
+      autoscrollCb.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
     block.appendChild(header);
     const body = document.createElement('pre');
     body.className = 'term-body';
@@ -109,11 +119,25 @@ export function renderTerminalBlock(
   }
 
   const body = block.querySelector('.term-body') as HTMLElement;
-  if (body && outputChunk) {
+  const autoscrollCb = block.querySelector('.term-autoscroll') as HTMLInputElement | null;
+  const termAutoScrollEnabled = autoscrollCb ? autoscrollCb.checked : true;
+
+  if (body && outputChunk !== undefined) {
+    const isTermNearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 50;
+
+    // Normalize newlines to prevent carriage return issues collapsing lines
+    const normalizedChunk = outputChunk.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    let raw = body.getAttribute('data-raw') || '';
     if (append) {
-      body.textContent = (body.textContent || '') + outputChunk;
+      raw += normalizedChunk;
     } else {
-      body.textContent = outputChunk;
+      raw = normalizedChunk;
+    }
+    body.setAttribute('data-raw', raw);
+    body.innerHTML = ansiToHtml(raw);
+
+    if (termAutoScrollEnabled && (isTermNearBottom || !append)) {
+      body.scrollTop = body.scrollHeight;
     }
   }
 
@@ -123,7 +147,9 @@ export function renderTerminalBlock(
     block.classList.remove('term-done');
   }
 
-  (block as HTMLElement).scrollIntoView({ block: 'end' });
+  if (chatAutoScrollEnabled && isChatNearBottom) {
+    container.scrollTop = container.scrollHeight;
+  }
   return block as HTMLElement;
 }
 
@@ -223,4 +249,231 @@ export function fmtAge(ts: number): string {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h`;
   return `${Math.floor(hrs / 24)}d`;
+}
+
+export function ansiToHtml(text: string): string {
+  const fgMap: Record<number, string> = {
+    30: 'var(--vscode-terminal-ansiBlack)',
+    31: 'var(--vscode-terminal-ansiRed)',
+    32: 'var(--vscode-terminal-ansiGreen)',
+    33: 'var(--vscode-terminal-ansiYellow)',
+    34: 'var(--vscode-terminal-ansiBlue)',
+    35: 'var(--vscode-terminal-ansiMagenta)',
+    36: 'var(--vscode-terminal-ansiCyan)',
+    37: 'var(--vscode-terminal-ansiWhite)',
+    90: 'var(--vscode-terminal-ansiBrightBlack)',
+    91: 'var(--vscode-terminal-ansiBrightRed)',
+    92: 'var(--vscode-terminal-ansiBrightGreen)',
+    93: 'var(--vscode-terminal-ansiBrightYellow)',
+    94: 'var(--vscode-terminal-ansiBrightBlue)',
+    95: 'var(--vscode-terminal-ansiBrightMagenta)',
+    96: 'var(--vscode-terminal-ansiBrightCyan)',
+    97: 'var(--vscode-terminal-ansiBrightWhite)',
+  };
+
+  const bgMap: Record<number, string> = {
+    40: 'var(--vscode-terminal-ansiBlack)',
+    41: 'var(--vscode-terminal-ansiRed)',
+    42: 'var(--vscode-terminal-ansiGreen)',
+    43: 'var(--vscode-terminal-ansiYellow)',
+    44: 'var(--vscode-terminal-ansiBlue)',
+    45: 'var(--vscode-terminal-ansiMagenta)',
+    46: 'var(--vscode-terminal-ansiCyan)',
+    47: 'var(--vscode-terminal-ansiWhite)',
+    100: 'var(--vscode-terminal-ansiBrightBlack)',
+    101: 'var(--vscode-terminal-ansiBrightRed)',
+    102: 'var(--vscode-terminal-ansiBrightGreen)',
+    103: 'var(--vscode-terminal-ansiBrightYellow)',
+    104: 'var(--vscode-terminal-ansiBrightBlue)',
+    105: 'var(--vscode-terminal-ansiBrightMagenta)',
+    106: 'var(--vscode-terminal-ansiBrightCyan)',
+    107: 'var(--vscode-terminal-ansiBrightWhite)',
+  };
+
+  let html = '';
+  let i = 0;
+  let bold = false;
+  let italic = false;
+  let underline = false;
+  let fg: string | null = null;
+  let bg: string | null = null;
+  let openSpan = false;
+
+  function closeSpanIfOpen() {
+    if (openSpan) {
+      html += '</span>';
+      openSpan = false;
+    }
+  }
+
+  function openNewSpan() {
+    closeSpanIfOpen();
+    const styles: string[] = [];
+    if (bold) styles.push('font-weight: bold');
+    if (italic) styles.push('font-style: italic');
+    if (underline) styles.push('text-decoration: underline');
+    if (fg) styles.push(`color: ${fg}`);
+    if (bg) styles.push(`background-color: ${bg}`);
+
+    if (styles.length > 0) {
+      html += `<span style="${styles.join('; ')}">`;
+      openSpan = true;
+    }
+  }
+
+  while (i < text.length) {
+    if (text[i] === '\u001b' || text[i] === '\x1b') {
+      let j = i + 1;
+      if (text[j] === '[') {
+        j++;
+        while (j < text.length && !/[a-zA-Z]/.test(text[j])) {
+          j++;
+        }
+        if (j < text.length) {
+          const sequence = text.slice(i + 2, j);
+          const commandType = text[j];
+          i = j + 1;
+
+          if (commandType === 'm') {
+            const codes = sequence.split(';').map(Number);
+            let cIdx = 0;
+            while (cIdx < codes.length) {
+              const code = codes[cIdx];
+              if (code === 0) {
+                bold = false;
+                italic = false;
+                underline = false;
+                fg = null;
+                bg = null;
+                cIdx++;
+              } else if (code === 1) {
+                bold = true;
+                cIdx++;
+              } else if (code === 3) {
+                italic = true;
+                cIdx++;
+              } else if (code === 4) {
+                underline = true;
+                cIdx++;
+              } else if (code === 22) {
+                bold = false;
+                cIdx++;
+              } else if (code === 23) {
+                italic = false;
+                cIdx++;
+              } else if (code === 24) {
+                underline = false;
+                cIdx++;
+              } else if (fgMap[code] !== undefined) {
+                fg = fgMap[code];
+                cIdx++;
+              } else if (code === 39) {
+                fg = null;
+                cIdx++;
+              } else if (bgMap[code] !== undefined) {
+                bg = bgMap[code];
+                cIdx++;
+              } else if (code === 49) {
+                bg = null;
+                cIdx++;
+              } else if (code === 38) {
+                if (cIdx + 1 < codes.length) {
+                  const type = codes[cIdx + 1];
+                  if (type === 5 && cIdx + 2 < codes.length) {
+                    const colorIndex = codes[cIdx + 2];
+                    fg = getAnsiColorByIndex(colorIndex);
+                    cIdx += 3;
+                  } else if (type === 2 && cIdx + 4 < codes.length) {
+                    const r = codes[cIdx + 2];
+                    const g = codes[cIdx + 3];
+                    const b = codes[cIdx + 4];
+                    fg = `rgb(${r},${g},${b})`;
+                    cIdx += 5;
+                  } else {
+                    cIdx++;
+                  }
+                } else {
+                  cIdx++;
+                }
+              } else if (code === 48) {
+                if (cIdx + 1 < codes.length) {
+                  const type = codes[cIdx + 1];
+                  if (type === 5 && cIdx + 2 < codes.length) {
+                    const colorIndex = codes[cIdx + 2];
+                    bg = getAnsiColorByIndex(colorIndex);
+                    cIdx += 3;
+                  } else if (type === 2 && cIdx + 4 < codes.length) {
+                    const r = codes[cIdx + 2];
+                    const g = codes[cIdx + 3];
+                    const b = codes[cIdx + 4];
+                    bg = `rgb(${r},${g},${b})`;
+                    cIdx += 5;
+                  } else {
+                    cIdx++;
+                  }
+                } else {
+                  cIdx++;
+                }
+              } else {
+                cIdx++;
+              }
+            }
+            openNewSpan();
+          }
+          continue;
+        }
+      }
+    }
+
+    const char = text[i];
+    if (char === '<') {
+      html += '&lt;';
+    } else if (char === '>') {
+      html += '&gt;';
+    } else if (char === '&') {
+      html += '&amp;';
+    } else {
+      html += char;
+    }
+    i++;
+  }
+
+  closeSpanIfOpen();
+  return html;
+}
+
+function getAnsiColorByIndex(index: number): string {
+  const standard = [
+    'var(--vscode-terminal-ansiBlack)',
+    'var(--vscode-terminal-ansiRed)',
+    'var(--vscode-terminal-ansiGreen)',
+    'var(--vscode-terminal-ansiYellow)',
+    'var(--vscode-terminal-ansiBlue)',
+    'var(--vscode-terminal-ansiMagenta)',
+    'var(--vscode-terminal-ansiCyan)',
+    'var(--vscode-terminal-ansiWhite)',
+    'var(--vscode-terminal-ansiBrightBlack)',
+    'var(--vscode-terminal-ansiBrightRed)',
+    'var(--vscode-terminal-ansiBrightGreen)',
+    'var(--vscode-terminal-ansiBrightYellow)',
+    'var(--vscode-terminal-ansiBrightBlue)',
+    'var(--vscode-terminal-ansiBrightMagenta)',
+    'var(--vscode-terminal-ansiBrightCyan)',
+    'var(--vscode-terminal-ansiBrightWhite)'
+  ];
+  if (index < 16) {
+    return standard[index];
+  }
+  if (index >= 16 && index <= 231) {
+    const adjusted = index - 16;
+    const r = Math.floor(adjusted / 36) * 51;
+    const g = Math.floor((adjusted % 36) / 6) * 51;
+    const b = (adjusted % 6) * 51;
+    return `rgb(${r},${g},${b})`;
+  }
+  if (index >= 232 && index <= 255) {
+    const val = 8 + (index - 232) * 10;
+    return `rgb(${val},${val},${val})`;
+  }
+  return 'initial';
 }

@@ -91,9 +91,12 @@ function shouldAutoScroll(): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
 }
 function autoScroll(): void {
-  if (shouldAutoScroll()) messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+  const toggle = document.getElementById('autoscroll-chat') as HTMLInputElement | null;
+  const enabled = toggle ? toggle.checked : true;
+  if (enabled && shouldAutoScroll()) {
+    messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+  }
 }
-
 // Render markdown on a short interval (200ms). Each flush accumulates text
 // and schedules a render — the timer coalesces bursts of chunks so we don't
 // call marked.parse() on every single token, but still render frequently
@@ -433,6 +436,16 @@ document.addEventListener('click', closeFn);
 // Resize
 window.addEventListener('resize', () => requestAnimationFrame(syncComposerHeight));
 requestAnimationFrame(syncComposerHeight);
+
+// Chat auto-scroll toggle change handler
+const autoScrollChatCb = document.getElementById('autoscroll-chat') as HTMLInputElement | null;
+if (autoScrollChatCb) {
+  autoScrollChatCb.addEventListener('change', () => {
+    if (autoScrollChatCb.checked) {
+      messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+    }
+  });
+}
 
 // ── Message handler ──────────────────────────────────
 window.addEventListener('message', (e: MessageEvent) => {

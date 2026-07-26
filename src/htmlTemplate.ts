@@ -164,6 +164,10 @@ ${CSS_TEMPLATE}
         <div class="cmd-arg-hint">Enter to confirm · Esc to cancel</div>
       </div>
     </div>
+    <div id="autoscroll-chat-wrap" style="display: flex; align-items: center; gap: 4px; margin-right: 8px; font-size: 0.75em; color: var(--vscode-descriptionForeground); user-select: none;">
+      <input type="checkbox" id="autoscroll-chat" checked style="margin: 0; cursor: pointer;" />
+      <label for="autoscroll-chat" style="cursor: pointer;">Auto-scroll</label>
+    </div>
     <div class="bar-spacer"></div>
     <div id="input-btns">
       <div id="action-area">
