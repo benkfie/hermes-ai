@@ -227,19 +227,32 @@ export class AcpClient extends EventEmitter {
 
   /** List all ACP sessions from the server. */
   async listSessions(cwd?: string): Promise<AcpSessionInfo[]> {
-    const result = await this.call('session/list', { cwd }) as { sessions: AcpSessionInfo[]; next_cursor?: string };
-    return result?.sessions ?? [];
+    const result = await this.call('session/list', { cwd }) as { sessions: any[]; next_cursor?: string };
+    if (!result?.sessions) return [];
+    return result.sessions.map(s => ({
+      session_id: s.sessionId || s.session_id,
+      cwd: s.cwd,
+      title: s.title,
+      updated_at: s.updatedAt || s.updated_at
+    }));
   }
 
   /** Get a single ACP session by ID. */
   async getSession(sessionId: string): Promise<AcpSessionInfo | null> {
-    const result = await this.call('session/get', { sessionId }) as { session: AcpSessionInfo } | null;
-    return result?.session ?? null;
+    const result = await this.call('session/get', { sessionId }) as { session: any } | null;
+    if (!result?.session) return null;
+    const s = result.session;
+    return {
+      session_id: s.sessionId || s.session_id,
+      cwd: s.cwd,
+      title: s.title,
+      updated_at: s.updatedAt || s.updated_at
+    };
   }
 
   /** Create a new ACP session with initial history. */
   async createSessionWithHistory(messages: unknown[], cwd: string): Promise<string> {
-    const result = await this.call('session/create_with_history', { messages, cwd }) as { sessionId: string };
-    return result?.sessionId ?? '';
+    const result = await this.call('session/create_with_history', { messages, cwd }) as { sessionId?: string; session_id?: string };
+    return result?.sessionId ?? result?.session_id ?? '';
   }
 }
