@@ -50,6 +50,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
     this.mediaRoot = path.join(this.context.globalStorageUri.fsPath, 'media');
     fs.mkdirSync(this.mediaRoot, { recursive: true });
     this.store = new SessionStore(context);
+    this.store.setLogger(log);
     // Wire the ACP client into the store so it can fetch server-side sessions
     this.store.setAcpClient(session.getClient());
   }
