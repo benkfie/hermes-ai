@@ -99,6 +99,12 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
 
     // Route session updates to the webview
     this.session.onUpdate((event) => {
+      const activeSessionId = this.session.getSessionId();
+      if (!activeSessionId || event.session_id !== activeSessionId) {
+        // Ignore updates from background or inactive sessions
+        return;
+      }
+
       if (event.text) {
         // Convert MEDIA:/path references to webview-safe img URIs
         const converted = this.convertMediaPaths(event.text, webviewView.webview);
