@@ -58,7 +58,7 @@ export class SessionStore {
     this.logger('[SessionStore] allSessions called, acpClient exists: ' + !!this.acpClient);
     if (!this.acpClient) {
       this.logger('[SessionStore] returning local sessions only: ' + this.sessions.length);
-      return [...this.sessions].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
+      return [...this.sessions].sort((a, b) => (a.lastActive ?? 0) - (b.lastActive ?? 0));
     }
 
     this.logger('[SessionStore] calling listSessions globally');
@@ -78,28 +78,29 @@ export class SessionStore {
       // Add ACP sessions that don't have a corresponding extension session
       for (const acp of acpSessions) {
         const existing = this.sessions.find(s => s.acpSessionId === acp.session_id);
+        const lastActiveTime = acp.updated_at ? new Date(acp.updated_at).getTime() : 0;
         if (!existing) {
           this.logger('[SessionStore] merging new ACP session: ' + acp.session_id);
           merged.push({
             id: `ext-${acp.session_id}`,  // prefix to avoid collision
             title: acp.title || acp.session_id.slice(0, 8),
-            createdAt: Date.now(),
+            createdAt: lastActiveTime || Date.now(),
             messages: [],
             acpSessionId: acp.session_id,
-            lastActive: acp.updated_at ? new Date(acp.updated_at).getTime() : 0,
+            lastActive: lastActiveTime,
           });
         } else {
           // Update title from server if it's more recent
           if (acp.updated_at && acp.title && existing.title !== acp.title) {
             this.logger('[SessionStore] updating existing session title: ' + existing.id + ' -> ' + acp.title);
             existing.title = acp.title;
-            existing.lastActive = new Date(acp.updated_at).getTime();
+            existing.lastActive = lastActiveTime;
           }
         }
       }
       
-      // Sort by lastActive descending (newest first)
-      const sorted = merged.sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
+      // Sort by lastActive ascending (oldest first) so chatPanel's reverse() makes them newest first
+      const sorted = merged.sort((a, b) => (a.lastActive ?? 0) - (b.lastActive ?? 0));
       this.logger('[SessionStore] total merged sessions count: ' + sorted.length);
       return sorted;
     } catch (err: any) {
