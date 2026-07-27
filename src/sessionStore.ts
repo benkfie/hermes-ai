@@ -25,11 +25,11 @@ export class SessionStore {
     ) {
       const saved = context.workspaceState.get<ChatSession[]>(SESSIONS_KEY);
       if (saved && saved.length > 0) {
-        // Filter out legacy TUI sessions (which start with a date stamp, e.g. 20260706_013133_...)
-        // and backup sessions (which start with 'backup-'). Keep pure local and all valid UUID/ACP sessions.
+        // Filter out only backup sessions (which start with 'backup-').
+        // Keep pure local, TUI (timestamp-based), and UUID-based ACP sessions.
         this.sessions = saved
           .map(s => ({ ...s, messages: s.messages ?? [], lastActive: s.lastActive ?? 0 }))
-          .filter(s => !s.acpSessionId || (!s.acpSessionId.startsWith('backup-') && !/^\d{8}_\d{6}_/.test(s.acpSessionId)));
+          .filter(s => !s.acpSessionId || !s.acpSessionId.startsWith('backup-'));
         // Find the most recently active session
         this.activeSessionId = this.sessions
           .sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0))[0]?.id ?? '';
