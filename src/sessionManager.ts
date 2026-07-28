@@ -101,20 +101,22 @@ export class SessionManager {
     async loadSessionHistory(sessionId: string, cwd: string): Promise<boolean> {
       try {
         this.log(`[session] loadSessionHistory: loading ${sessionId}`);
+        this.sessionId = sessionId;
         const result = await this.client.call('session/load', {
           sessionId,
           cwd,
           mcpServers: [],
         });
         if (result !== null && result !== undefined) {
-          this.sessionId = sessionId;
           this.storedSessionId = null; // consumed
           this.log(`[session] loadSessionHistory: resumed ${sessionId}`);
           return true;
         }
+        this.sessionId = null;
         this.log(`[session] loadSessionHistory: ${sessionId} not found`);
         return false;
       } catch (err) {
+        this.sessionId = null;
         this.log(`[session] loadSessionHistory: failed (${err})`);
         return false;
       }
@@ -140,6 +142,7 @@ export class SessionManager {
       this.storedSessionId = null;
       try {
         this.log(`[session] attempting session/load ${storedId}`);
+        this.sessionId = storedId;
         const result = await this.client.call('session/load', {
           sessionId: storedId,
           cwd,
@@ -147,12 +150,13 @@ export class SessionManager {
         });
         // Adapter returns null when session not found — load_session() → None
         if (result !== null && result !== undefined) {
-          this.sessionId = storedId;
           this.log(`[session] resumed ${storedId}`);
           return this.sessionId;
         }
+        this.sessionId = null;
         this.log(`[session] stored session ${storedId} not found on adapter, creating new`);
       } catch (err) {
+        this.sessionId = null;
         this.log(`[session] session/load failed (${err}), creating new`);
       }
       // Fall through to session/new

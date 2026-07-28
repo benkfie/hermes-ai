@@ -213,6 +213,15 @@ statusSessionEl.addEventListener('click', (e) => {
 });
 setupSessionPickerHandlers(sessionPicker, vscode, S, closeFn);
 
+const btnNewSession = document.getElementById('btn-new-session') as HTMLButtonElement | null;
+if (btnNewSession) {
+  btnNewSession.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeFn();
+    vscode.postMessage({ type: 'newSession' });
+  });
+}
+
 // Model switcher
 const modelSearch = document.getElementById('model-search') as HTMLInputElement | null;
 const modelMenuItems = document.getElementById('model-menu-items') as HTMLDivElement | null;

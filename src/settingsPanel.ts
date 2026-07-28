@@ -464,8 +464,9 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <div class="layout">
-    <nav class="sidebar">
+      <nav class="sidebar">
       <button class="tab active" data-tab="general">General</button>
+      <button class="tab" data-tab="providers">Providers</button>
       <button class="tab" data-tab="model">Model</button>
       <button class="tab" data-tab="terminal">Terminal</button>
       <button class="tab" data-tab="about">About</button>
@@ -500,6 +501,26 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
         </div>
         <div class="spacer">
           <button id="save-general">Save Changes</button>
+        </div>
+      </div>
+
+      <!-- Providers -->
+      <div class="section" id="section-providers">
+        <h2>Providers</h2>
+        <div class="field">
+          <label>Pou Gateway URL</label>
+          <div class="field-row">
+            <input type="text" id="gateway-url" placeholder="http://localhost:3100" />
+            <button id="gateway-connect" class="small">Connect</button>
+          </div>
+        </div>
+        <div class="field">
+          <span id="gateway-status" class="status-badge">Not connected</span>
+        </div>
+        <div id="providers-list" style="margin-top:12px;"></div>
+        <div class="spacer">
+          <button id="refresh-providers" class="secondary">Refresh Providers</button>
+          <button id="add-provider" class="small" style="margin-left:8px;background:#2a7a2a;">+ Add Provider</button>
         </div>
       </div>
 

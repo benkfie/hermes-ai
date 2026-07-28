@@ -49,7 +49,30 @@ export function appendMessage(container: HTMLElement, role: 'user' | 'agent' | '
 
 export function showWaiting(container: HTMLElement): void {
   const el = appendDiv(container, 'status-line');
-  el.id = 'waiting'; el.textContent = '…';
+  el.id = 'waiting';
+  const startTime = Date.now();
+
+  function formatElapsed(): string {
+    const secs = Math.floor((Date.now() - startTime) / 1000);
+    if (secs < 30) return `Thinking… ${secs}s`;
+    if (secs < 60) return `Taking a while… ${secs}s — you can Cancel if needed`;
+    const mins = Math.floor(secs / 60);
+    const rem = secs % 60;
+    return `Still working… ${mins}m ${rem}s`;
+  }
+
+  el.textContent = 'Thinking…';
+
+  // Tick every second to update the elapsed counter
+  const interval = setInterval(() => {
+    if (!document.contains(el)) {
+      // Element was removed — stop the timer
+      clearInterval(interval);
+      return;
+    }
+    el.textContent = formatElapsed();
+  }, 1000);
+
   el.scrollIntoView({ block: 'end' });
 }
 

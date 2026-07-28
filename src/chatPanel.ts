@@ -20,6 +20,12 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
 
   private view?: vscode.WebviewView;
   private busy = false;
+  /**
+   * Set to true when the user explicitly cancels an in-flight prompt.
+   * Guards against server-side errors that arrive after local cancel fires
+   * (which would otherwise race with the 'done' signal and leave the UI stuck).
+   */
+  private cancelledInFlight = false;
   private messageQueue: string[] = [];
   private lastTurnText = '';
   private lastTurnTools: StoredMessage[] = [];
@@ -238,10 +244,12 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
         this.post({ type: 'statusBar', todoState: event.todoState });
       }
       if (event.done) {
-        // End any in-progress history replay capture
+        // End any in-progress history replay capture — call immediately since
+        // session/load returning signals end of replay stream. The 50ms delay
+        // was a best-guess; this is now reliable because loadSessionHistory
+        // awaits the full session/load RPC before returning.
         if (this.replayingHistory) {
-          // Give a tick for trailing chunks, then flush
-          setTimeout(() => this.finishReplayCapture(), 50);
+          this.finishReplayCapture();
         }
         // Detect model-switch response and update status bar
         const modelMatch = /model (?:switched|changed) to:\s*([\w\-\.]+)/i.exec(this.lastTurnText);
@@ -292,7 +300,12 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
     this.replayTimer = setTimeout(() => this.finishReplayCapture(), 4000);
   }
 
-  private finishReplayCapture(): void {
+  /**
+   * Flush the history replay buffer into the session store.
+   * Called either immediately after session/load returns (primary path)
+   * or by the 4s safety timer if session/load never triggered a done event.
+   */
+  finishReplayCapture(): void {
       if (!this.replayingHistory) return;
       this.replayingHistory = false;
       if (this.replayTimer) { clearTimeout(this.replayTimer); this.replayTimer = null; }
@@ -348,6 +361,20 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
     void this.broadcastSessions();
   }
 
+  /**
+   * Called by extension.ts when the ACP process exits unexpectedly.
+   * Clears any in-flight busy state and posts a disconnect status so
+   * the webview unlocks the composer and shows a reconnect message.
+   */
+  notifyDisconnected(): void {
+    this.log('[ui] ACP process exited — clearing busy state');
+    this.busy = false;
+    this.cancelledInFlight = false;
+    this.messageQueue = [];
+    this.session.reset();
+    this.post({ type: 'status', status: 'disconnected' });
+  }
+
   private saveTurnToSession(): void {
     this.store.addTurnMessages(this.lastTurnTools, this.lastTurnText);
     this.lastTurnText = '';
@@ -369,6 +396,11 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
   private async handleFromWebview(msg: FromWebview): Promise<void> {
     if (msg.type === 'send' && msg.text) {
       this.log(`[ui] send (${msg.text.length} chars)`);
+      if (msg.text.trim() === '/new' || msg.text.trim() === '/clear') {
+        this.log('[ui] /new or /clear command intercepted');
+        await this.handleNewSession();
+        return;
+      }
       // Store user message in history (skip slash commands)
       if (!msg.text.startsWith('/')) {
         const newTitle = this.store.autoTitle(msg.text);
@@ -421,6 +453,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
       // Don't clear the queue — queued messages should be sent after cancel
       this.lastTurnText = '';
       this.lastTurnTools = [];
+      this.cancelledInFlight = true;
       await this.session.cancel();
 
     } else if (msg.type === 'switchModel' && msg.model) {
@@ -437,14 +470,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
       void this.runPrompt(command);
 
     } else if (msg.type === 'newSession') {
-      this.log('[ui] new session');
-      this.messageQueue = [];
-      this.lastTurnText = '';
-      this.lastTurnTools = [];
-      this.session.reset();
-      this.store.createSession('new session');
-      this.post({ type: 'clear' });
-      this.broadcastSessions();
+      await this.handleNewSession();
 
     } else if (msg.type === 'switchSession' && msg.sessionId) {
               this.log(`[ui] switch session ${msg.sessionId}`);
@@ -472,6 +498,9 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
                 try {
                   this.startReplayCapture();
                   const loaded = await this.session.loadSessionHistory(target.acpSessionId, cwd);
+                  // Flush replay immediately — session/load returning signals end of stream.
+                  // Don't wait for the 4s safety timer or the done-event 50ms fallback.
+                  this.finishReplayCapture();
                   if (loaded) {
                     this.store.setAcpSessionId(target.acpSessionId);
                     this.log(`[session] switch: resumed ${target.acpSessionId}`);
@@ -479,6 +508,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
                     this.log(`[session] switch: ACP session ${target.acpSessionId} not found, showing blank`);
                   }
                 } catch (err) {
+                  this.finishReplayCapture(); // flush even on error
                   this.log(`[session] switch: failed to load ACP session history: ${err}`);
                 }
               } else if (target.messages.length > 0) {
@@ -620,7 +650,14 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
       await this.session.sendPrompt(prompt, cwd);
     } catch (err) {
       const msg = String(err);
-      if (msg.includes('Cancelled')) {
+      if (msg.includes('Cancelled') || this.cancelledInFlight) {
+        // User explicitly cancelled. Local promptReject() already fired 'done'.
+        // Suppress any ACP server-side error that races in after the cancel —
+        // they are expected (e.g. -32603 from the now-fixed None.startswith crash)
+        // and should not cause a second conflicting signal to the webview.
+        if (!msg.includes('Cancelled')) {
+          this.log(`[ui] suppressed post-cancel ACP error: ${msg}`);
+        }
         this.post({ type: 'done' });
       } else {
         this.log(`[ui] prompt error ${msg}`);
@@ -629,6 +666,7 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
     } finally {
       this.log('[ui] prompt finished');
       this.busy = false;
+      this.cancelledInFlight = false;
       if (this.messageQueue.length > 0) {
         const next = this.messageQueue.shift()!;
         this.post({ type: 'busy', active: true, queued: this.messageQueue.length });
@@ -727,6 +765,35 @@ export class ChatPanelProvider implements vscode.WebviewViewProvider {
         sessionTitle: this.store.active()?.title,
       });
     }
+
+  private async handleNewSession(): Promise<void> {
+    this.log('[ui] creating new session');
+    this.messageQueue = [];
+    this.lastTurnText = '';
+    this.lastTurnTools = [];
+    this.session.reset();
+    
+    // Create new session in local store
+    this.store.createSession('new session');
+    
+    // Clear chat view in webview
+    this.post({ type: 'clear' });
+    this.broadcastSessions();
+
+    // Call session/new on the server to initialize the session in the backend!
+    const cwd = this.resolveWorkingDirectory();
+    try {
+      await this.session.ensureSession(cwd);
+      const serverSessionId = this.session.getSessionId();
+      if (serverSessionId) {
+        this.store.setAcpSessionId(serverSessionId);
+        this.broadcastSessions();
+        this.log(`[ui] server-side session created and synced: ${serverSessionId}`);
+      }
+    } catch (err) {
+      this.log(`[ui] failed to initialize server-side session: ${err}`);
+    }
+  }
 
 
   private buildHtml(webview: vscode.Webview): string {

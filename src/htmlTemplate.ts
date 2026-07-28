@@ -91,6 +91,7 @@ ${CSS_TEMPLATE}
     <div id="header-session">
       <span class="sessions-label">Sessions</span>
       <button id="status-session" title="Switch session">new session</button>
+      <button id="btn-new-session" title="New Session" style="background: transparent; border: none; outline: none; cursor: pointer; color: var(--vscode-foreground); opacity: 0.6; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 3px; font-size: 1.1em; transition: opacity 0.15s, background-color 0.15s; margin-left: 2px; padding: 0;">＋</button>
       <div id="status-right">
         <div id="ctx-bar-wrap" style="display:none"><div id="ctx-bar"></div><div id="ctx-bar-fresh"></div></div>
         <span id="status-context"></span>
@@ -251,6 +252,10 @@ const CSS_TEMPLATE = /* css */ `
     }
     #status-session:hover { background: var(--accent-subtle); }
     #status-session::before { content: '💬 '; font-size: 0.9em; }
+    #btn-new-session:hover {
+      opacity: 1 !important;
+      background-color: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.1));
+    }
     *:focus-visible {
       outline: 1px solid var(--vscode-focusBorder, var(--accent));
       outline-offset: 1px;

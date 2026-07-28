@@ -61,10 +61,11 @@ export class SessionStore {
       return [...this.sessions].sort((a, b) => (a.lastActive ?? 0) - (b.lastActive ?? 0));
     }
 
-    this.logger('[SessionStore] calling listSessions globally');
+    this.logger('[SessionStore] calling listSessions for workspace');
     try {
-      const acpSessions = await this.acpClient.listSessions(undefined);
-      this.logger('[SessionStore] listSessions returned count: ' + acpSessions.length);
+      const cwd = this.getCwd();
+      const acpSessions = await this.acpClient.listSessions(cwd);
+      this.logger('[SessionStore] listSessions returned count: ' + acpSessions.length + ' (cwd=' + cwd + ')');
       for (const s of acpSessions) {
         this.logger(`[SessionStore] ACP session: ID=${s.session_id}, title=${s.title}, cwd=${s.cwd}, updated_at=${s.updated_at}`);
       }

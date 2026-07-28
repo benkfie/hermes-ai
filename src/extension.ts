@@ -218,6 +218,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   outputChannel = vscode.window.createOutputChannel('Hermes AI');
   context.subscriptions.push(outputChannel);
 
+  // DIAGNOSTIC TEST
+  try {
+    const cp = require('child_process');
+    outputChannel.appendLine('[diagnostic] Spawning trace python diagnostic...');
+    const traceProc = cp.spawn(
+      'C:\\Users\\Ben\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe',
+      ['-u', 'C:\\Users\\Ben\\.gemini\\antigravity-ide\\brain\\6a9c0b73-0aff-4c24-9103-8bfc5a1c42ce\\scratch\\diagnostic_run.py']
+    );
+    traceProc.stdout.on('data', (data: any) => {
+      outputChannel.appendLine(data.toString().trim());
+    });
+    traceProc.stderr.on('data', (data: any) => {
+      outputChannel.appendLine(`[diagnostic-stderr] ${data.toString().trim()}`);
+    });
+    traceProc.on('close', (code: any) => {
+      outputChannel.appendLine(`[diagnostic] Trace process finished with exit code ${code}`);
+    });
+  } catch (e: any) {
+    outputChannel.appendLine(`[diagnostic] Failed to launch trace process: ${e.message}`);
+  }
+
   const configuredHermes = readConfiguredHermesPath();
   if (configuredHermes.workspaceOverrideIgnored) {
     outputChannel.appendLine('[security] Ignoring workspace-scoped hermes.path override');
@@ -249,9 +270,47 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   client.on('log', (line: string) => outputChannel.appendLine(line));
+
+  let reconnectAttempts = 0;
+  const MAX_RECONNECT_ATTEMPTS = 3;
+
+  function scheduleReconnect(delayMs: number): void {
+    reconnectAttempts++;
+    outputChannel.appendLine(`[acp] auto-reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delayMs}ms`);
+    setTimeout(async () => {
+      if (!client || client.running) return; // already reconnected or stopped
+      outputChannel.appendLine('[acp] attempting auto-reconnect…');
+      try {
+        await ensureConnected();
+        reconnectAttempts = 0; // success — reset counter
+      } catch {
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          scheduleReconnect(delayMs * 2); // exponential backoff
+        } else {
+          outputChannel.appendLine('[acp] max reconnect attempts reached, giving up');
+          void vscode.window.showErrorMessage(
+            'Hermes disconnected and could not reconnect automatically.',
+            'Reconnect',
+          ).then(choice => {
+            if (choice === 'Reconnect') {
+              reconnectAttempts = 0;
+              void ensureConnected();
+            }
+          });
+        }
+      }
+    }, delayMs);
+  }
+
   client.on('exit', (code: number) => {
     outputChannel.appendLine(`[hermes acp exited: code ${code}]`);
     setStatus('disconnected');
+    // Notify panel so it clears any stuck busy state
+    panel.notifyDisconnected();
+    // Don't auto-reconnect on clean exit (code 0) or deliberate stop
+    if (code !== 0 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      scheduleReconnect(1000);
+    }
   });
 
   const permissionHandler: PermissionRequestHandler = async (_method, params) => {
@@ -429,12 +488,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         panel.startReplayCapture();
         try {
           const loaded = await session.loadSessionHistory(storedAcpId, cwd);
+          // Flush immediately — session/load returning signals end of replay stream.
+          panel.finishReplayCapture();
           if (loaded) {
             outputChannel.appendLine(`[session] resumed ACP session ${storedAcpId}`);
           } else {
             outputChannel.appendLine(`[session] ACP session ${storedAcpId} not found, will create new on first prompt`);
           }
         } catch (err) {
+          panel.finishReplayCapture(); // flush even on error
           outputChannel.appendLine(`[session] failed to load ACP session: ${err}`);
         }
       }
