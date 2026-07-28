@@ -14,6 +14,7 @@
 !resources/hermes-icon.svg
 !resources/hermes-iconv2.svg
 !resources/hermes-iconv2.png
+!resources/icon.svg
 
 # Exclude internal docs
 CLAUDE.md
