@@ -264,7 +264,7 @@ export class SettingsPanelProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'unsafe-inline';">
+    content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'unsafe-inline'; connect-src http://localhost:* https://localhost:* http://127.0.0.1:* https://127.0.0.1:*;">
   <title>Hermes AI Settings</title>
   <style>
     :root {
